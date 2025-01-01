@@ -102,6 +102,56 @@ function Reload-Path {
     }
 }
 
+function Write-Log {
+    param([string]$Message)
+    Write-Host "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'): $Message"
+}
+
+function Set-RegistryValue {
+    param (
+        [string]$Path,
+        [string]$Name,
+        $Value,
+        [string]$Type = "DWORD"
+    )
+    
+    try {
+        if (-not (Test-Path $Path)) {
+            New-Item -Path $Path -Force | Out-Null
+            Write-Log "Created new registry path: $Path"
+        }
+        Set-ItemProperty -Path $Path -Name $Name -Value $Value
+        Write-Log "Successfully set registry value: $Path\$Name"
+    }
+    catch {
+        Write-Log "Error setting registry value: $_"
+        throw
+    }
+}
+
+function Restart-Explorer {
+    try {
+        Write-Log "Restarting Explorer to apply changes..."
+        Get-Process "explorer" | Stop-Process -Force
+        Start-Sleep -Seconds 2
+        Start-Process "explorer"
+        Write-Log "Explorer restarted successfully"
+    }
+    catch {
+        Write-Log "Error restarting Explorer: $_"
+        throw
+    }
+}
+
+# Export additional utility functions
+Export-ModuleMember -Function @(
+    'Set-Env',
+    'Reload-Path',
+    'Write-Log',
+    'Set-RegistryValue',
+    'Restart-Explorer'
+)
+
 # Example usage:
 # Set-Env -Name 'PATH' -Value 'C:\Users\admin\AppData\Local\Microsoft\WinGet\Packages\sxyazi.yazi_Microsoft.Winget.Source_8wekyb3d8bbwe\yazi-x86_64-pc-windows-msvc' -Scope 'User' -Verbose
 # Reload-Path -Verbose 
