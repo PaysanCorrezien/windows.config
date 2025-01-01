@@ -85,9 +85,37 @@ function Set-WindowsStyle {
     }
 }
 
+function Set-Fonts {
+    try {
+        Write-Log "Starting font installation..."
+        
+        # Install FiraCode Nerd Font using Chocolatey
+        Write-Log "Installing FiraCode Nerd Font..."
+        choco install nerd-fonts-firacode -y
+        
+        # Refresh font cache
+        Write-Log "Refreshing font cache..."
+        $FONTS = 0x14
+        $objShell = New-Object -ComObject Shell.Application
+        $objFolder = $objShell.Namespace($FONTS)
+        
+        # Release COM objects
+        $null = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($objShell)
+        $null = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($objFolder)
+        
+        Write-Log "Font installation and cache refresh completed successfully"
+        Write-Host "Font installation complete. Please restart WezTerm for the changes to take effect."
+    }
+    catch {
+        Write-Log "Error installing fonts: $_"
+        throw
+    }
+}
+
 # Export the style-related functions
 Export-ModuleMember -Function @(
     'Set-WindowsStyle',
     'Hide-Taskbar',
-    'Hide-DesktopIcons'
+    'Hide-DesktopIcons',
+    'Set-Fonts'
 )
