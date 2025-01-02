@@ -1,9 +1,21 @@
 #!/usr/bin/env pwsh
-#Requires -RunAsAdministrator
 Set-StrictMode -Version 3.0
 
 function Test-Command($cmdname) {
     return [bool](Get-Command -Name $cmdname -ErrorAction SilentlyContinue)
+}
+
+function Test-AdminPrivileges {
+    $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+    return $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Request-AdminPrivileges {
+    if (-not (Test-AdminPrivileges)) {
+        Write-Host "Requesting administrative privileges..." -ForegroundColor Yellow
+        Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Wait
+        exit
+    }
 }
 
 function Install-GitIfNeeded {
@@ -55,9 +67,13 @@ function Start-Installation {
     
     Set-Location $RepoPath
     
-    # Run the installation script
+    # Run the installation script with elevated privileges
     Write-Host "Running installation script..." -ForegroundColor Yellow
-    & .\install.ps1
+    if (-not (Test-AdminPrivileges)) {
+        Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$RepoPath\install.ps1`"" -Wait
+    } else {
+        & .\install.ps1
+    }
     
     if (-not $?) {
         Write-Error "Installation failed"
@@ -69,6 +85,9 @@ function Start-Installation {
 
 # Main execution
 Write-Host "Starting Windows configuration setup..." -ForegroundColor Cyan
+
+# Request admin privileges if needed for Git installation
+Request-AdminPrivileges
 
 # Install Git if needed
 Install-GitIfNeeded

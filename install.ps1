@@ -34,11 +34,18 @@ Write-Host "`nStarting installation process...`n" -ForegroundColor Cyan
 if (-not (Test-StageFlag "windows-utility")) {
     Write-Status "Running Windows setup utility..." -Status "Starting" -Color "Yellow"
     
-    # Run Windows setup utility
-    if (-not (Invoke-ExternalCommand -Command 'irm "https://christitus.com/win" | iex' `
-            -Description "Windows Setup Utility" -UseShell)) {
-        Write-Error "Failed to run Windows setup utility"
-        exit 1
+    # Run Windows setup utility with error handling
+    try {
+        $setupCommand = 'irm "https://christitus.com/win" | iex'
+        if (-not (Invoke-ExternalCommand -Command $setupCommand -Description "Windows Setup Utility" -UseShell)) {
+            throw "Failed to run Windows setup utility"
+        }
+    } catch {
+        Write-Warning "Windows setup utility encountered an error: $_"
+        Write-Host "You can try running it manually by visiting: https://christitus.com/win" -ForegroundColor Yellow
+        if (-not (Get-UserConfirmation "Would you like to continue with the rest of the installation?")) {
+            exit 1
+        }
     }
     
     Write-Host "`nPlease review and complete the Windows setup utility configuration." -ForegroundColor Yellow
@@ -617,6 +624,39 @@ if (-not (Test-StageFlag "personal-repos-setup")) {
     }
 } else {
     Write-Status "Personal repositories" -Status "Already configured" -Color "Green"
+}
+
+# 20. Final System Configurations
+if (-not (Test-StageFlag "final-system-config")) {
+    Write-Status "Applying final system configurations..." -Status "Starting" -Color "Yellow"
+    
+    # Configure Git SSH command
+    if (-not (Invoke-ExternalCommand -Command 'git config --global core.sshCommand "C:/Windows/System32/OpenSSH/ssh.exe"' `
+            -Description "Configuring Git SSH command")) {
+        Write-Error "Failed to configure Git SSH command"
+        exit 1
+    }
+    Write-Status "Git SSH configuration" -Status "Completed" -Color "Green"
+    
+    # Rename computer
+    $currentName = $env:COMPUTERNAME
+    Write-Host "`nCurrent computer name: $currentName" -ForegroundColor Yellow
+    Write-Host "Would you like to rename your computer? If yes, provide a new name." -ForegroundColor Yellow
+    $newName = Read-Host "Enter new computer name (or press Enter to skip)"
+    
+    if ($newName -and ($newName -ne $currentName)) {
+        if (-not (Invoke-ExternalCommand -Command "Rename-Computer -NewName '$newName' -Force" `
+                -Description "Renaming computer")) {
+            Write-Error "Failed to rename computer"
+            exit 1
+        }
+        Write-Host "`nComputer has been renamed to '$newName'. A restart will be required for this change to take effect." -ForegroundColor Yellow
+    }
+    
+    Set-StageFlag "final-system-config"
+    Write-Status "Final system configurations" -Status "Completed" -Color "Green"
+} else {
+    Write-Status "Final system configurations" -Status "Already configured" -Color "Green"
 }
 
 Write-Host "`nInstallation completed successfully!`n" -ForegroundColor Green 
