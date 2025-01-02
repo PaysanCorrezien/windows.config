@@ -11,43 +11,35 @@ ${function:Write-Log} = $utils['Write-Log']
 
 function Add-NeovimContextMenu {
     [CmdletBinding()]
-    param (
-        [Parameter(Mandatory=$false)]
-        [string]$MenuName = "Edit with Neovim",
-        [Parameter(Mandatory=$false)]
-        [string]$ScriptPath = $PSScriptRoot
-    )
+    param()
 
     try {
-        $nvimCommand = Join-Path $ScriptPath "nvim-wezterm.bat"
+        $scriptPath = Split-Path -Parent $PSScriptRoot
+        Write-Verbose "Script path: $scriptPath"
         
-        Write-Verbose "Script path: $ScriptPath"
+        # Look for nvim-wezterm.bat in the scripts directory
+        $nvimCommand = Join-Path $scriptPath "scripts\nvim-wezterm.bat"
         Write-Verbose "Nvim command path: $nvimCommand"
-
-        if (!(Test-Path $nvimCommand)) {
+        
+        if (-not (Test-Path $nvimCommand)) {
             throw "nvim-wezterm.bat not found at: $nvimCommand"
         }
 
-        # Create context menu entry
-        Write-Verbose "Creating context menu entry..."
-        $menuCmd = "reg add `"HKEY_CLASSES_ROOT\*\shell\EditWithNeovim`" /ve /d `"$MenuName`" /f"
-        $result = cmd /c $menuCmd 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            throw "Failed to create menu entry: $result"
-        }
-
-        # Create command
-        Write-Verbose "Creating command entry..."
-        $cmdValue = "`"$nvimCommand`" `"%1`""
-        $commandCmd = "reg add `"HKEY_CLASSES_ROOT\*\shell\EditWithNeovim\command`" /ve /d `"$cmdValue`" /f"
-        $result = cmd /c $commandCmd 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            throw "Failed to create command: $result"
-        }
-
-        Write-Host "Context menu entry added successfully"
+        # Create registry entries for the context menu
+        $registryPath = "Registry::HKEY_CLASSES_ROOT\*\shell\nvim"
+        
+        # Create the main menu entry
+        New-Item -Path $registryPath -Force | Out-Null
+        Set-ItemProperty -Path $registryPath -Name "(default)" -Value "Edit with Neovim"
+        Set-ItemProperty -Path $registryPath -Name "Icon" -Value "nvim-qt.exe"
+        
+        # Create the command entry
+        New-Item -Path "$registryPath\command" -Force | Out-Null
+        Set-ItemProperty -Path "$registryPath\command" -Name "(default)" -Value "`"$nvimCommand`" `"%1`""
+        
         return $true
-    } catch {
+    }
+    catch {
         Write-Error "Failed to create context menu entry: $_"
         return $false
     }
