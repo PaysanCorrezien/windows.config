@@ -42,11 +42,24 @@ function Test-ScoopInstallation {
 function Handle-Error {
     param (
         [string]$ErrorMessage,
-        [string]$Stage
+        [string]$Stage,
+        [System.Management.Automation.ErrorRecord]$ErrorRecord = $null
     )
     Write-Error $ErrorMessage
     Write-Host "`nAn error occurred during $Stage." -ForegroundColor Red
-    Write-Host "You can investigate the error before deciding to continue or exit." -ForegroundColor Yellow
+    
+    if ($ErrorRecord) {
+        Write-Host "`nDetailed Error Information:" -ForegroundColor Yellow
+        Write-Host "Exception Type: $($ErrorRecord.Exception.GetType().FullName)" -ForegroundColor Yellow
+        Write-Host "Exception Message: $($ErrorRecord.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "Error Category: $($ErrorRecord.CategoryInfo.Category)" -ForegroundColor Yellow
+        if ($ErrorRecord.ScriptStackTrace) {
+            Write-Host "`nStack Trace:" -ForegroundColor Yellow
+            Write-Host $ErrorRecord.ScriptStackTrace -ForegroundColor Gray
+        }
+    }
+
+    Write-Host "`nYou can investigate the error before deciding to continue or exit." -ForegroundColor Yellow
     if (-not (Get-UserConfirmation "Would you like to continue with the rest of the installation?")) {
         Write-Host "Script stopped. You can run it again after fixing the issue." -ForegroundColor Yellow
         Write-Host "Press any key to exit..." -ForegroundColor Yellow
@@ -240,29 +253,47 @@ if (-not (Test-StageFlag "yazi-deps")) {
     # Check for Python
     if (-not (Test-Command "python")) {
         Write-Status "Python not found. Installing Python..." -Status "Starting" -Color "Yellow"
-        if (-not (Invoke-ExternalCommand -Command 'winget install Python.Python.3.11' `
-                -Description "Installing Python")) {
-            Handle-Error "Failed to install Python" "Python Installation"
+        try {
+            if (-not (Invoke-ExternalCommand -Command 'winget install Python.Python.3.11' `
+                    -Description "Installing Python")) {
+                Handle-Error "Failed to install Python" "Python Installation" $Error[0]
+            }
+            Reload-Path
         }
-        Reload-Path
+        catch {
+            Handle-Error "Failed to install Python: $_" "Python Installation" $_
+        }
     }
     
     # Add Git usr/bin to PATH for Yazi
     $gitUsrBinPath = "C:\Program Files\Git\usr\bin"
     if (Test-Path $gitUsrBinPath) {
-        if (-not (Invoke-ExternalCommand -Command "Set-Env -Name 'PATH' -Value '$gitUsrBinPath' -Scope 'Machine' -Verbose" `
-                -Description "Adding Git usr/bin to PATH")) {
-            Handle-Error "Failed to add Git usr/bin to PATH" "Git usr/bin to PATH"
+        try {
+            if (-not (Invoke-ExternalCommand -Command "Set-Env -Name 'PATH' -Value '$gitUsrBinPath' -Scope 'Machine' -Verbose" `
+                    -Description "Adding Git usr/bin to PATH")) {
+                Handle-Error "Failed to add Git usr/bin to PATH" "Git usr/bin to PATH" $Error[0]
+            }
+            Reload-Path
         }
-        Reload-Path
+        catch {
+            Handle-Error "Failed to add Git usr/bin to PATH: $_" "Git usr/bin to PATH" $_
+        }
     } else {
-        Handle-Error "Git usr/bin path not found. Please ensure Git is installed correctly." "Git usr/bin path"
+        Handle-Error "Git usr/bin path not found at $gitUsrBinPath. Please ensure Git is installed correctly." "Git usr/bin path"
     }
     
     # Install Yazi
-    if (-not (Invoke-ExternalCommand -Command 'winget install sxyazi.yazi' `
-            -Description "Installing Yazi")) {
-        Handle-Error "Failed to install Yazi" "Yazi Installation"
+    try {
+        Write-Host "Installing Yazi..." -ForegroundColor Yellow
+        $result = Invoke-ExternalCommand -Command 'winget install sxyazi.yazi' `
+            -Description "Installing Yazi"
+        if (-not $result) {
+            $lastError = $Error[0]
+            Handle-Error "Failed to install Yazi. Exit code: $LASTEXITCODE" "Yazi Installation" $lastError
+        }
+    }
+    catch {
+        Handle-Error "Failed to install Yazi: $_" "Yazi Installation" $_
     }
     
     # Install dependencies
