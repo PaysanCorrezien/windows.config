@@ -219,7 +219,11 @@ function Invoke-ExternalCommand {
     }
 }
 
-# Return a hashtable of functions instead of using Export-ModuleMember
+function Test-Command($cmdname) {
+    return [bool](Get-Command -Name $cmdname -ErrorAction SilentlyContinue)
+}
+
+# Return a hashtable of functions
 @{
     'Set-Env' = ${function:Set-Env}
     'Reload-Path' = ${function:Reload-Path}
@@ -230,6 +234,7 @@ function Invoke-ExternalCommand {
     'Set-StageFlag' = ${function:Set-StageFlag}
     'Test-StageFlag' = ${function:Test-StageFlag}
     'Invoke-ExternalCommand' = ${function:Invoke-ExternalCommand}
+    'Test-Command' = ${function:Test-Command}
 }
 
 # Example usage:

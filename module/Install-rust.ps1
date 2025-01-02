@@ -1,3 +1,7 @@
+# Import utility functions
+$utils = . "$PSScriptRoot\utils.ps1"
+${function:Test-Command} = $utils['Test-Command']
+
 function Test-RustInstallation {
     return (Test-Command "rustc") -and (Test-Command "cargo")
 }
@@ -24,7 +28,8 @@ function Install-Rust {
     cargo --version
 }
 
-Export-ModuleMember -Function @(
-    'Install-Rust',
-    'Test-RustInstallation'
-)
+# Return a hashtable of functions
+@{
+    'Install-Rust' = ${function:Install-Rust}
+    'Test-RustInstallation' = ${function:Test-RustInstallation}
+}

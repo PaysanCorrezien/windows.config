@@ -1,5 +1,9 @@
 # Run this script with administrator privileges
 
+# Import utility functions
+$utils = . "$PSScriptRoot\utils.ps1"
+${function:Test-Command} = $utils['Test-Command']
+
 function Test-KeyboardLayout {
     $customLayout = Get-CustomLayoutCode
     $currentLayouts = Get-InstalledKeyboardLayouts
@@ -150,4 +154,14 @@ function Set-CustomKeyboardLayout {
         Write-Host "✗ Error: $_" -ForegroundColor Red
         return $false
     }
+}
+
+# Return a hashtable of functions
+@{
+    'Test-KeyboardLayout' = ${function:Test-KeyboardLayout}
+    'Install-CustomLayout' = ${function:Install-CustomLayout}
+    'Get-CustomLayoutCode' = ${function:Get-CustomLayoutCode}
+    'Remove-AllOtherLayouts' = ${function:Remove-AllOtherLayouts}
+    'Set-SingleCustomKeyboard' = ${function:Set-SingleCustomKeyboard}
+    'Set-CustomKeyboardLayout' = ${function:Set-CustomKeyboardLayout}
 }

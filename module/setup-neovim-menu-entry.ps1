@@ -5,6 +5,10 @@
 
 Set-StrictMode -Version 3.0
 
+# Import utility functions
+$utils = . "$PSScriptRoot\utils.ps1"
+${function:Write-Log} = $utils['Write-Log']
+
 function Add-NeovimContextMenu {
     [CmdletBinding()]
     param (
@@ -139,11 +143,9 @@ function Set-FileAssociation {
     }
 }
 
-# Example usage:
-# Add-NeovimContextMenu -Verbose
-# Set-FileAssociation -FileExtensions @("txt", "md", "json") -VerifyAssociations -Verbose
-
-# Run the function if script is executed directly
-if ($MyInvocation.InvocationName -eq '.\setup-neovim-menu-entry.ps1') {
-    Add-NeovimContextMenu -Verbose
+# Return a hashtable of functions
+@{
+    'Add-NeovimContextMenu' = ${function:Add-NeovimContextMenu}
+    'Get-CurrentFileAssociation' = ${function:Get-CurrentFileAssociation}
+    'Set-FileAssociation' = ${function:Set-FileAssociation}
 } 

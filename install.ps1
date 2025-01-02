@@ -12,6 +12,16 @@ $script:neovimMenu = . "$modulePath\setup-neovim-menu-entry.ps1"
 $script:keyboardLayout = . "$modulePath\keyboard-layout.ps1"
 $script:rustInstall = . "$modulePath\Install-rust.ps1"
 
+# Import functions into current scope for easier access
+${function:Write-Status} = $utils['Write-Status']
+${function:Write-Log} = $utils['Write-Log']
+${function:Set-StageFlag} = $utils['Set-StageFlag']
+${function:Test-StageFlag} = $utils['Test-StageFlag']
+${function:Invoke-ExternalCommand} = $utils['Invoke-ExternalCommand']
+${function:Set-Env} = $utils['Set-Env']
+${function:Reload-Path} = $utils['Reload-Path']
+${function:Test-Command} = $utils['Test-Command']
+
 function Get-UserConfirmation {
     param (
         [string]$Message
