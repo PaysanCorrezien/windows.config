@@ -48,9 +48,25 @@ if (-not (Test-StageFlag "windows-utility")) {
     
     # Run Windows setup utility with error handling
     try {
-        $setupCommand = 'irm "https://christitus.com/win" | iex'
-        if (-not (Invoke-ExternalCommand -Command $setupCommand -Description "Windows Setup Utility" -UseShell)) {
-            throw "Failed to run Windows setup utility"
+        # Download and execute the script directly
+        Write-Host "Downloading and running Windows setup utility..." -ForegroundColor Yellow
+        $setupScript = Invoke-RestMethod -Uri "https://christitus.com/win"
+        
+        if ($setupScript) {
+            # Execute the script in the current scope
+            $scriptBlock = [ScriptBlock]::Create($setupScript)
+            & $scriptBlock
+            
+            Write-Host "`nPlease review and complete the Windows setup utility configuration." -ForegroundColor Yellow
+            if (Get-UserConfirmation "Did you successfully complete the Windows setup utility configuration?") {
+                Set-StageFlag "windows-utility"
+                Write-Status "Windows setup utility" -Status "Completed" -Color "Green"
+            } else {
+                Write-Error "Windows setup utility was not completed successfully. Please run the script again."
+                exit 1
+            }
+        } else {
+            throw "Failed to download Windows setup utility"
         }
     } catch {
         Write-Warning "Windows setup utility encountered an error: $_"
@@ -58,15 +74,6 @@ if (-not (Test-StageFlag "windows-utility")) {
         if (-not (Get-UserConfirmation "Would you like to continue with the rest of the installation?")) {
             exit 1
         }
-    }
-    
-    Write-Host "`nPlease review and complete the Windows setup utility configuration." -ForegroundColor Yellow
-    if (Get-UserConfirmation "Did you successfully complete the Windows setup utility configuration?") {
-        Set-StageFlag "windows-utility"
-        Write-Status "Windows setup utility" -Status "Completed" -Color "Green"
-    } else {
-        Write-Error "Windows setup utility was not completed successfully. Please run the script again."
-        exit 1
     }
 }
 
