@@ -58,7 +58,7 @@ function Get-CustomLayoutCode {
     foreach ($lang in $layouts) {
         foreach ($layout in $lang.InputMethodTips) {
             # Look specifically for the Alt Gr dead keys layout
-            if ($layout -match 'Alt Gr dead keys|ALTGR|d0010409') {
+            if ($layout -match 'Alt Gr dead keys|ALTGR|a0010409|a0000409') {
                 Write-Host "Found custom layout: $layout" -ForegroundColor Cyan
                 return $layout
             }
@@ -73,19 +73,21 @@ function Get-CustomLayoutCode {
         $layoutName = $layout.PSObject.Properties['Layout Display Name']?.Value
         $layoutId = $layout.PSChildName
         
-        if (($layoutFile -and $layoutFile -match 'ALTGR') -or 
-            ($layoutName -and $layoutName -match 'Alt Gr dead keys|ALTGR') -or
-            $layoutId -eq 'd0010409') {
+        if (($layoutFile -and $layoutFile -match 'intl-alt\.dll') -or 
+            ($layoutName -and $layoutName -match 'Alt Gr dead keys') -or
+            $layoutId -match 'a0010409|a0000409') {
             $code = "0409:$layoutId"
             Write-Host "Found custom layout in registry: $code" -ForegroundColor Cyan
             return $code
         }
     }
 
-    # Last resort: check for the known layout ID directly
-    $knownLayoutId = "0409:d0010409"
-    Write-Host "Trying known layout ID: $knownLayoutId" -ForegroundColor Yellow
-    return $knownLayoutId
+    # Last resort: check for the known layout IDs
+    $knownLayoutIds = @("0409:a0010409", "0409:a0000409")
+    foreach ($layoutId in $knownLayoutIds) {
+        Write-Host "Trying known layout ID: $layoutId" -ForegroundColor Yellow
+        return $layoutId
+    }
 }
 
 function Ensure-EnglishLanguage {
@@ -212,11 +214,11 @@ function Set-CustomKeyboardLayout {
                 
                 Set-WinUserLanguageList $languageList -Force
                 
-                # Check registry directly
+                # Check registry directly for our specific layout
                 $layouts = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layouts\*' -ErrorAction SilentlyContinue
                 foreach ($layout in $layouts) {
-                    if ($layout.PSObject.Properties['Layout File']?.Value -match 'ALTGR' -or 
-                        $layout.PSObject.Properties['Layout Display Name']?.Value -match 'ALTGR') {
+                    if (($layout.PSObject.Properties['Layout File']?.Value -eq 'intl-alt.dll') -or 
+                        ($layout.PSChildName -match 'a0010409|a0000409')) {
                         $success = $true
                         break
                     }
