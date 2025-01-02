@@ -40,12 +40,24 @@ function Clone-Repository {
     if (Test-Path $repoPath) {
         Write-Host "Repository directory already exists at $repoPath" -ForegroundColor Yellow
         Write-Host "Updating repository with latest changes..." -ForegroundColor Yellow
+        
+        # Store current location
+        $currentLocation = Get-Location
+        
+        # Change to repo directory and update
         Set-Location $repoPath
-        git pull
+        git pull | Out-Host
+        
+        # Check git pull result
         if (-not $?) {
+            Set-Location $currentLocation
             Write-Error "Failed to update repository"
             exit 1
         }
+        
+        # Restore location
+        Set-Location $currentLocation
+        
         Write-Host "Repository updated successfully" -ForegroundColor Green
         return $repoPath
     }
