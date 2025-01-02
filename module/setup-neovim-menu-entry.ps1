@@ -65,14 +65,13 @@ function Set-FileAssociation {
         [Parameter(Mandatory=$true)]
         [string[]]$FileExtensions,
         [Parameter(Mandatory=$false)]
-        [string]$ScriptPath = $PSScriptRoot,
-        [Parameter(Mandatory=$false)]
         [switch]$VerifyAssociations
     )
 
     try {
-        $nvimCommand = Join-Path $ScriptPath "nvim-wezterm.bat"
-        Write-Verbose "Script path: $ScriptPath"
+        $scriptPath = Split-Path -Parent $PSScriptRoot
+        $nvimCommand = Join-Path $scriptPath "scripts\nvim-wezterm.bat"
+        Write-Verbose "Script path: $scriptPath"
         Write-Verbose "Nvim command path: $nvimCommand"
 
         if (!(Test-Path $nvimCommand)) {

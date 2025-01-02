@@ -688,26 +688,22 @@ if (-not (Test-StageFlag "opener-setup")) {
 
 # 16. ChatGPT Setup
 if (-not (Test-StageFlag "chatgpt-setup")) {
-    Write-Status "Installing ChatGPT Desktop..." -Status "Starting" -Color "Yellow"
+    Write-Status "Setting up ChatGPT..." -Status "Starting" -Color "Yellow"
     
-    # Install ChatGPT
-    if (-not (Install-WithWinget -PackageId "OpenAI.ChatGPT")) {
-        if (-not (Handle-Error "Failed to install ChatGPT" "ChatGPT Installation" $Error[0])) {
-            Exit-Script
-            return
-        }
-    }
-    
-    Write-Host "`nPlease configure ChatGPT:" -ForegroundColor Yellow
-    Write-Host "1. Launch ChatGPT" -ForegroundColor Yellow
-    Write-Host "2. Sign in to your OpenAI account" -ForegroundColor Yellow
-    Write-Host "3. Configure your preferred settings" -ForegroundColor Yellow
+    Write-Host "`nPlease setup ChatGPT:" -ForegroundColor Yellow
+    Write-Host "1. Download ChatGPT from the Microsoft Store" -ForegroundColor Yellow
+    Write-Host "2. Launch ChatGPT" -ForegroundColor Yellow
+    Write-Host "3. Sign in to your OpenAI account" -ForegroundColor Yellow
+    Write-Host "4. Configure your preferred settings" -ForegroundColor Yellow
     
     if (Get-UserConfirmation "Did you successfully set up ChatGPT?") {
         Set-StageFlag "chatgpt-setup"
         Write-Status "ChatGPT setup" -Status "Completed" -Color "Green"
     } else {
-        Handle-Error "ChatGPT setup was not completed successfully" "ChatGPT Setup"
+        if (-not (Handle-Error "ChatGPT setup was not completed" "ChatGPT Setup")) {
+            Exit-Script
+            return
+        }
     }
 } else {
     Write-Status "ChatGPT" -Status "Already configured" -Color "Green"
