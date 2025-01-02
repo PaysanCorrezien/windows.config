@@ -48,10 +48,24 @@ function Handle-Error {
     Write-Host "`nAn error occurred during $Stage." -ForegroundColor Red
     Write-Host "You can investigate the error before deciding to continue or exit." -ForegroundColor Yellow
     if (-not (Get-UserConfirmation "Would you like to continue with the rest of the installation?")) {
-        Write-Host "Exiting script. You can run it again after fixing the issue." -ForegroundColor Yellow
-        exit 1
+        Write-Host "Script stopped. You can run it again after fixing the issue." -ForegroundColor Yellow
+        Write-Host "Press any key to exit..." -ForegroundColor Yellow
+        $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+        return $false
     }
     Write-Host "Continuing with the next step..." -ForegroundColor Green
+    return $true
+}
+
+function Pause-Script {
+    Write-Host "Press any key to continue..." -ForegroundColor Yellow
+    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+}
+
+function Exit-Script {
+    Write-Host "Press any key to exit..." -ForegroundColor Yellow
+    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+    return
 }
 
 # Main installation process
@@ -71,15 +85,19 @@ if (-not (Test-StageFlag "windows-utility")) {
             Set-StageFlag "windows-utility"
             Write-Status "Windows setup utility" -Status "Completed" -Color "Green"
         } else {
-            Write-Error "Windows setup utility was not completed successfully. Please run the script again."
-            exit 1
+            Write-Host "Windows setup utility was not completed successfully." -ForegroundColor Red
+            Write-Host "Press any key to exit..." -ForegroundColor Yellow
+            $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+            return
         }
     } catch {
         Write-Warning "Windows setup utility encountered an error: $_"
         Write-Host "You can try running it manually by opening a new PowerShell window and running:" -ForegroundColor Yellow
         Write-Host "irm christitus.com/win | iex" -ForegroundColor Cyan
         if (-not (Get-UserConfirmation "Would you like to continue with the rest of the installation?")) {
-            exit 1
+            Write-Host "Press any key to exit..." -ForegroundColor Yellow
+            $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+            return
         }
     }
 }
@@ -91,14 +109,20 @@ if (-not (Test-StageFlag "windows-activation")) {
     # Activate Windows
     if (-not (Invoke-ExternalCommand -Command 'irm https://get.activated.win | iex' `
             -Description "Windows Activation" -UseShell)) {
-        Handle-Error "Failed to activate Windows" "Windows Activation"
+        if (-not (Handle-Error "Failed to activate Windows" "Windows Activation")) {
+            Exit-Script
+            return
+        }
     } else {
         Write-Host "`nPlease verify that Windows was activated correctly." -ForegroundColor Yellow
         if (Get-UserConfirmation "Was Windows activated successfully?") {
             Set-StageFlag "windows-activation"
             Write-Status "Windows activation" -Status "Completed" -Color "Green"
         } else {
-            Handle-Error "Windows activation was not completed successfully" "Windows Activation"
+            if (-not (Handle-Error "Windows activation was not completed successfully" "Windows Activation")) {
+                Exit-Script
+                return
+            }
         }
     }
 }
@@ -109,7 +133,10 @@ if (-not (Test-KeyboardLayout)) {
     Write-Host "Installing custom keyboard layout..." -ForegroundColor Yellow
     Set-CustomKeyboardLayout
     if (-not $?) {
-        Handle-Error "Failed to install keyboard layout" "Keyboard Layout Installation"
+        if (-not (Handle-Error "Failed to install keyboard layout" "Keyboard Layout Installation")) {
+            Exit-Script
+            return
+        }
     } else {
         Write-Status "Keyboard layout installation" -Status "Installed" -Color "Green"
     }
@@ -122,7 +149,10 @@ if (-not (Test-StageFlag "style-settings")) {
     Write-Status "Applying style settings..." -Status "In Progress" -Color "Yellow"
     Set-WindowsStyle -HideTaskbar -HideDesktopIcons
     if (-not $?) {
-        Handle-Error "Failed to apply style settings" "Style Settings"
+        if (-not (Handle-Error "Failed to apply style settings" "Style Settings")) {
+            Exit-Script
+            return
+        }
     } else {
         Set-StageFlag "style-settings"
         Write-Status "Style settings" -Status "Applied" -Color "Green"
@@ -176,11 +206,14 @@ Invoke-RestMethod -Uri get.scoop.sh | Invoke-Expression
         Write-Status "Scoop installation" -Status "Completed" -Color "Green"
     }
     catch {
-        Handle-Error "Error during Scoop installation: $_" "Scoop Installation"
-        Write-Host "`nYou can try installing Scoop manually:" -ForegroundColor Yellow
-        Write-Host "1. Open a new PowerShell window (non-admin)" -ForegroundColor Yellow
-        Write-Host "2. Run this command:" -ForegroundColor Yellow
-        Write-Host "   irm get.scoop.sh | iex" -ForegroundColor Cyan
+        if (-not (Handle-Error "Error during Scoop installation: $_" "Scoop Installation")) {
+            Write-Host "`nYou can try installing Scoop manually:" -ForegroundColor Yellow
+            Write-Host "1. Open a new PowerShell window (non-admin)" -ForegroundColor Yellow
+            Write-Host "2. Run this command:" -ForegroundColor Yellow
+            Write-Host "   irm get.scoop.sh | iex" -ForegroundColor Cyan
+            Exit-Script
+            return
+        }
     }
 } else {
     Write-Status "Scoop" -Status "Already installed" -Color "Green"
@@ -678,4 +711,5 @@ if (-not (Test-StageFlag "final-system-config")) {
     Write-Status "Final system configurations" -Status "Already configured" -Color "Green"
 }
 
-Write-Host "`nInstallation completed successfully!`n" -ForegroundColor Green 
+Write-Host "`nInstallation completed successfully!`n" -ForegroundColor Green
+Pause-Script 
