@@ -543,23 +543,55 @@ if (-not (Test-Command "ssh")) {
 if (-not (Test-StageFlag "keepassxc-setup")) {
     Write-Status "Installing KeePassXC..." -Status "Starting" -Color "Yellow"
     
-    # Install KeePassXC
-    if (-not (Invoke-ExternalCommand -Command 'winget install --id KeePassXCTeam.KeePassXC' `
-            -Description "Installing KeePassXC")) {
-        Handle-Error "Failed to install KeePassXC" "KeePassXC Installation"
+    try {
+        # First check if already installed
+        $checkOutput = winget list --id KeePassXCTeam.KeePassXC 2>&1
+        if ($checkOutput -match "KeePassXCTeam.KeePassXC") {
+            Write-Host "KeePassXC is already installed" -ForegroundColor Green
+        } else {
+            # Try to install with detailed error capture
+            Write-Host "Installing KeePassXC..." -ForegroundColor Yellow
+            $installOutput = winget install --exact --id KeePassXCTeam.KeePassXC --accept-source-agreements --accept-package-agreements 2>&1
+            $exitCode = $LASTEXITCODE
+
+            if ($exitCode -ne 0) {
+                $errorDetail = $installOutput | Out-String
+                if (-not (Handle-Error "Failed to install KeePassXC (Exit code: $exitCode)`nInstallation output:`n$errorDetail" "KeePassXC Installation" $Error[0])) {
+                    Write-Host "`nYou can try installing KeePassXC manually using:" -ForegroundColor Yellow
+                    Write-Host "winget install --exact --id KeePassXCTeam.KeePassXC" -ForegroundColor Cyan
+                    Exit-Script
+                    return
+                }
+            } else {
+                Write-Host "KeePassXC installation completed successfully" -ForegroundColor Green
+            }
+        }
+
+        Write-Host "`nPlease configure KeePassXC:" -ForegroundColor Yellow
+        Write-Host "1. Enable SSH Agent integration" -ForegroundColor Yellow
+        Write-Host "2. Allow browser authentication" -ForegroundColor Yellow
+        Write-Host "3. Test SSH key integration" -ForegroundColor Yellow
+        Write-Host "4. Test browser integration" -ForegroundColor Yellow
+        
+        if (Get-UserConfirmation "Did you successfully configure KeePassXC?") {
+            Set-StageFlag "keepassxc-setup"
+            Write-Status "KeePassXC setup" -Status "Completed" -Color "Green"
+        } else {
+            if (-not (Handle-Error "KeePassXC setup was not completed successfully" "KeePassXC Setup")) {
+                Exit-Script
+                return
+            }
+        }
     }
-    
-    Write-Host "`nPlease configure KeePassXC:" -ForegroundColor Yellow
-    Write-Host "1. Enable SSH Agent integration" -ForegroundColor Yellow
-    Write-Host "2. Allow browser authentication" -ForegroundColor Yellow
-    Write-Host "3. Test SSH key integration" -ForegroundColor Yellow
-    Write-Host "4. Test browser integration" -ForegroundColor Yellow
-    
-    if (Get-UserConfirmation "Did you successfully configure KeePassXC?") {
-        Set-StageFlag "keepassxc-setup"
-        Write-Status "KeePassXC setup" -Status "Completed" -Color "Green"
-    } else {
-        Handle-Error "KeePassXC setup was not completed successfully" "KeePassXC Setup"
+    catch {
+        $errorDetail = $_.Exception.Message
+        $stackTrace = $_.ScriptStackTrace
+        if (-not (Handle-Error "Failed to install KeePassXC with error: $errorDetail`nStack trace: $stackTrace" "KeePassXC Installation" $_)) {
+            Write-Host "`nYou can try installing KeePassXC manually using:" -ForegroundColor Yellow
+            Write-Host "winget install --exact --id KeePassXCTeam.KeePassXC" -ForegroundColor Cyan
+            Exit-Script
+            return
+        }
     }
 } else {
     Write-Status "KeePassXC" -Status "Already configured" -Color "Green"
