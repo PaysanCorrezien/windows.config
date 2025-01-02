@@ -159,12 +159,47 @@ function Set-CustomKeyboardLayout {
 
     try {
         if (Install-CustomLayout -MsiPath $MsiPath) {
-            # Wait a moment for the installation to complete
-            Start-Sleep -Seconds 2
-            Set-SingleCustomKeyboard
-            Write-Host "`n⚠ Please log off and log back on for changes to take effect" -ForegroundColor Yellow
-            Write-Host "✓ The Alt Gr dead keys layout will be the only layout available" -ForegroundColor Green
-            return $true
+            # Wait for the layout to be registered
+            Write-Host "Waiting for layout to be registered..." -ForegroundColor Yellow
+            $maxAttempts = 5
+            $attempt = 0
+            $success = $false
+
+            while ($attempt -lt $maxAttempts) {
+                Start-Sleep -Seconds 2
+                $attempt++
+                
+                # Refresh language list
+                $languageList = Get-WinUserLanguageList
+                Set-WinUserLanguageList $languageList -Force
+                
+                # Check registry directly
+                $layouts = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layouts\*' -ErrorAction SilentlyContinue
+                foreach ($layout in $layouts) {
+                    if ($layout.PSObject.Properties['Layout File']?.Value -match 'ALTGR' -or 
+                        $layout.PSObject.Properties['Layout Display Name']?.Value -match 'ALTGR') {
+                        $success = $true
+                        break
+                    }
+                }
+                
+                if ($success) {
+                    break
+                }
+                
+                Write-Host "Attempt $attempt of $maxAttempts - Layout not found yet..." -ForegroundColor Yellow
+            }
+
+            if ($success) {
+                Write-Host "✓ Layout registered successfully" -ForegroundColor Green
+                Set-SingleCustomKeyboard
+                Write-Host "`n⚠ Please log off and log back on for changes to take effect" -ForegroundColor Yellow
+                Write-Host "✓ The Alt Gr dead keys layout will be the only layout available" -ForegroundColor Green
+                return $true
+            } else {
+                Write-Host "✗ Layout registration timed out" -ForegroundColor Red
+                return $false
+            }
         }
         return $false
     } catch {
