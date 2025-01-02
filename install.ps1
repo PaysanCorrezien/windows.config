@@ -402,23 +402,55 @@ if (-not (Test-StageFlag "yazi-deps")) {
 if (-not (Test-StageFlag "nextcloud-setup")) {
     Write-Status "Installing Nextcloud..." -Status "Starting" -Color "Yellow"
     
-    # Install Nextcloud
-    if (-not (Invoke-ExternalCommand -Command 'winget install --id=Nextcloud.NextcloudDesktop -e' `
-            -Description "Installing Nextcloud")) {
-        Handle-Error "Failed to install Nextcloud" "Nextcloud Installation"
+    try {
+        # First check if already installed
+        $checkOutput = winget list --id Nextcloud.NextcloudDesktop 2>&1
+        if ($checkOutput -match "Nextcloud.NextcloudDesktop") {
+            Write-Host "Nextcloud is already installed" -ForegroundColor Green
+        } else {
+            # Try to install with detailed error capture
+            Write-Host "Installing Nextcloud..." -ForegroundColor Yellow
+            $installOutput = winget install --exact --id Nextcloud.NextcloudDesktop --accept-source-agreements --accept-package-agreements 2>&1
+            $exitCode = $LASTEXITCODE
+
+            if ($exitCode -ne 0) {
+                $errorDetail = $installOutput | Out-String
+                if (-not (Handle-Error "Failed to install Nextcloud (Exit code: $exitCode)`nInstallation output:`n$errorDetail" "Nextcloud Installation" $Error[0])) {
+                    Write-Host "`nYou can try installing Nextcloud manually using:" -ForegroundColor Yellow
+                    Write-Host "winget install --exact --id Nextcloud.NextcloudDesktop" -ForegroundColor Cyan
+                    Exit-Script
+                    return
+                }
+            } else {
+                Write-Host "Nextcloud installation completed successfully" -ForegroundColor Green
+            }
+        }
+
+        Write-Host "`nPlease:" -ForegroundColor Yellow
+        Write-Host "1. Launch Nextcloud" -ForegroundColor Yellow
+        Write-Host "2. Log in to your account" -ForegroundColor Yellow
+        Write-Host "3. Configure sync settings" -ForegroundColor Yellow
+        Write-Host "4. Verify sync is working" -ForegroundColor Yellow
+        
+        if (Get-UserConfirmation "Did you successfully set up Nextcloud and verify sync is working?") {
+            Set-StageFlag "nextcloud-setup"
+            Write-Status "Nextcloud setup" -Status "Completed" -Color "Green"
+        } else {
+            if (-not (Handle-Error "Nextcloud setup was not completed successfully" "Nextcloud Setup")) {
+                Exit-Script
+                return
+            }
+        }
     }
-    
-    Write-Host "`nPlease:" -ForegroundColor Yellow
-    Write-Host "1. Launch Nextcloud" -ForegroundColor Yellow
-    Write-Host "2. Log in to your account" -ForegroundColor Yellow
-    Write-Host "3. Configure sync settings" -ForegroundColor Yellow
-    Write-Host "4. Verify sync is working" -ForegroundColor Yellow
-    
-    if (Get-UserConfirmation "Did you successfully set up Nextcloud and verify sync is working?") {
-        Set-StageFlag "nextcloud-setup"
-        Write-Status "Nextcloud setup" -Status "Completed" -Color "Green"
-    } else {
-        Handle-Error "Nextcloud setup was not completed successfully" "Nextcloud Setup"
+    catch {
+        $errorDetail = $_.Exception.Message
+        $stackTrace = $_.ScriptStackTrace
+        if (-not (Handle-Error "Failed to install Nextcloud with error: $errorDetail`nStack trace: $stackTrace" "Nextcloud Installation" $_)) {
+            Write-Host "`nYou can try installing Nextcloud manually using:" -ForegroundColor Yellow
+            Write-Host "winget install --exact --id Nextcloud.NextcloudDesktop" -ForegroundColor Cyan
+            Exit-Script
+            return
+        }
     }
 } else {
     Write-Status "Nextcloud" -Status "Already installed" -Color "Green"
@@ -428,23 +460,55 @@ if (-not (Test-StageFlag "nextcloud-setup")) {
 if (-not (Test-StageFlag "uniget-setup")) {
     Write-Status "Installing UniGet UI..." -Status "Starting" -Color "Yellow"
     
-    # Install UniGet UI
-    if (-not (Invoke-ExternalCommand -Command 'winget install --exact --id MartiCliment.UniGetUI --source winget' `
-            -Description "Installing UniGet UI")) {
-        Handle-Error "Failed to install UniGet UI" "UniGet UI Installation"
+    try {
+        # First check if already installed
+        $checkOutput = winget list --id MartiCliment.UniGetUI 2>&1
+        if ($checkOutput -match "MartiCliment.UniGetUI") {
+            Write-Host "UniGet UI is already installed" -ForegroundColor Green
+        } else {
+            # Try to install with detailed error capture
+            Write-Host "Installing UniGet UI..." -ForegroundColor Yellow
+            $installOutput = winget install --exact --id MartiCliment.UniGetUI --source winget --accept-source-agreements --accept-package-agreements 2>&1
+            $exitCode = $LASTEXITCODE
+
+            if ($exitCode -ne 0) {
+                $errorDetail = $installOutput | Out-String
+                if (-not (Handle-Error "Failed to install UniGet UI (Exit code: $exitCode)`nInstallation output:`n$errorDetail" "UniGet UI Installation" $Error[0])) {
+                    Write-Host "`nYou can try installing UniGet UI manually using:" -ForegroundColor Yellow
+                    Write-Host "winget install --exact --id MartiCliment.UniGetUI --source winget" -ForegroundColor Cyan
+                    Exit-Script
+                    return
+                }
+            } else {
+                Write-Host "UniGet UI installation completed successfully" -ForegroundColor Green
+            }
+        }
+
+        Write-Host "`nPlease:" -ForegroundColor Yellow
+        Write-Host "1. Launch UniGet UI" -ForegroundColor Yellow
+        Write-Host "2. Accept dependencies" -ForegroundColor Yellow
+        Write-Host "3. Load your previous settings" -ForegroundColor Yellow
+        Write-Host "4. Reinstall your previous working state" -ForegroundColor Yellow
+        
+        if (Get-UserConfirmation "Did you successfully set up UniGet UI and restore your settings?") {
+            Set-StageFlag "uniget-setup"
+            Write-Status "UniGet UI setup" -Status "Completed" -Color "Green"
+        } else {
+            if (-not (Handle-Error "UniGet UI setup was not completed successfully" "UniGet UI Setup")) {
+                Exit-Script
+                return
+            }
+        }
     }
-    
-    Write-Host "`nPlease:" -ForegroundColor Yellow
-    Write-Host "1. Launch UniGet UI" -ForegroundColor Yellow
-    Write-Host "2. Accept dependencies" -ForegroundColor Yellow
-    Write-Host "3. Load your previous settings" -ForegroundColor Yellow
-    Write-Host "4. Reinstall your previous working state" -ForegroundColor Yellow
-    
-    if (Get-UserConfirmation "Did you successfully set up UniGet UI and restore your settings?") {
-        Set-StageFlag "uniget-setup"
-        Write-Status "UniGet UI setup" -Status "Completed" -Color "Green"
-    } else {
-        Handle-Error "UniGet UI setup was not completed successfully" "UniGet UI Setup"
+    catch {
+        $errorDetail = $_.Exception.Message
+        $stackTrace = $_.ScriptStackTrace
+        if (-not (Handle-Error "Failed to install UniGet UI with error: $errorDetail`nStack trace: $stackTrace" "UniGet UI Installation" $_)) {
+            Write-Host "`nYou can try installing UniGet UI manually using:" -ForegroundColor Yellow
+            Write-Host "winget install --exact --id MartiCliment.UniGetUI --source winget" -ForegroundColor Cyan
+            Exit-Script
+            return
+        }
     }
 } else {
     Write-Status "UniGet UI" -Status "Already configured" -Color "Green"
