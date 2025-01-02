@@ -4,6 +4,18 @@
 $utils = . "$PSScriptRoot\utils.ps1"
 ${function:Test-Command} = $utils['Test-Command']
 
+function Get-InstalledKeyboardLayouts {
+    # Get all installed keyboard layouts
+    $layouts = Get-WinUserLanguageList
+    $installedLayouts = @()
+    
+    foreach ($lang in $layouts) {
+        $installedLayouts += $lang.InputMethodTips
+    }
+    
+    return $installedLayouts
+}
+
 function Test-KeyboardLayout {
     $customLayout = Get-CustomLayoutCode
     $currentLayouts = Get-InstalledKeyboardLayouts
@@ -56,7 +68,12 @@ function Get-CustomLayoutCode {
     # If not found in language list, check registry
     $layouts = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layouts\*' -ErrorAction SilentlyContinue
     foreach ($layout in $layouts) {
-        if ($layout.Layout -match 'Alt Gr dead keys|ALTGR') {
+        # Check both Layout File and Layout Display Name properties
+        $layoutFile = $layout.PSObject.Properties['Layout File']?.Value
+        $layoutName = $layout.PSObject.Properties['Layout Display Name']?.Value
+        
+        if (($layoutFile -and $layoutFile -match 'Alt Gr dead keys|ALTGR') -or 
+            ($layoutName -and $layoutName -match 'Alt Gr dead keys|ALTGR')) {
             $code = "0409:$($layout.PSChildName)"
             Write-Host "Found custom layout in registry: $code" -ForegroundColor Cyan
             return $code
