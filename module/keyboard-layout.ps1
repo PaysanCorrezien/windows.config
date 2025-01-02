@@ -1,5 +1,11 @@
 # Run this script with administrator privileges
 
+function Test-KeyboardLayout {
+    $customLayout = Get-CustomLayoutCode
+    $currentLayouts = Get-InstalledKeyboardLayouts
+    return $currentLayouts -contains $customLayout
+}
+
 function Install-CustomLayout {
     [CmdletBinding()]
     param (
@@ -30,31 +36,97 @@ function Install-CustomLayout {
     }
 }
 
+function Get-CustomLayoutCode {
+    # Get all available keyboard layouts
+    $layouts = Get-WinUserLanguageList
+    foreach ($lang in $layouts) {
+        foreach ($layout in $lang.InputMethodTips) {
+            # Look specifically for the Alt Gr dead keys layout
+            if ($layout -match 'Alt Gr dead keys|ALTGR') {
+                Write-Host "Found custom layout: $layout" -ForegroundColor Cyan
+                return $layout
+            }
+        }
+    }
+    
+    # If not found in language list, check registry
+    $layouts = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layouts\*' -ErrorAction SilentlyContinue
+    foreach ($layout in $layouts) {
+        if ($layout.Layout -match 'Alt Gr dead keys|ALTGR') {
+            $code = "0409:$($layout.PSChildName)"
+            Write-Host "Found custom layout in registry: $code" -ForegroundColor Cyan
+            return $code
+        }
+    }
+    Write-Host "✗ Could not find Alt Gr dead keys layout" -ForegroundColor Red
+    return $null
+}
+
+function Remove-AllOtherLayouts {
+    # Remove all other keyboard layouts from registry
+    $customLayout = Get-CustomLayoutCode
+    if (-not $customLayout) { return }
+
+    # Remove from current user
+    $userLayoutPath = "HKCU:\Keyboard Layout\Preload"
+    if (Test-Path $userLayoutPath) {
+        # Remove all existing entries
+        Remove-Item -Path $userLayoutPath -Force -ErrorAction SilentlyContinue
+        # Create new with only our layout
+        New-Item -Path $userLayoutPath -Force | Out-Null
+        Set-ItemProperty -Path $userLayoutPath -Name "1" -Value $customLayout -Type String
+    }
+
+    # Remove from default user profile
+    $defaultUserPath = "C:\Users\Default\NTUSER.DAT"
+    if (Test-Path $defaultUserPath) {
+        reg load "HKU\Default" $defaultUserPath
+        $defaultLayoutPath = "Registry::HKU\Default\Keyboard Layout\Preload"
+        
+        # Remove all existing entries
+        if (Test-Path $defaultLayoutPath) {
+            Remove-Item -Path $defaultLayoutPath -Force -ErrorAction SilentlyContinue
+        }
+        # Create new with only our layout
+        New-Item -Path $defaultLayoutPath -Force | Out-Null
+        reg add "HKU\Default\Keyboard Layout\Preload" /v "1" /t REG_SZ /d $customLayout /f
+        
+        [gc]::Collect()
+        reg unload "HKU\Default"
+    }
+
+    # Also remove from language list
+    $languageList = Get-WinUserLanguageList
+    $enUS = $languageList | Where-Object { $_.LanguageTag -eq 'en-US' }
+    if ($enUS) {
+        $enUS.InputMethodTips.Clear()
+        $enUS.InputMethodTips.Add($customLayout)
+        Set-WinUserLanguageList -LanguageList $languageList -Force
+    }
+}
+
 function Set-SingleCustomKeyboard {
     [CmdletBinding()]
     param()
 
-    # Get current language list
-    $languageList = Get-WinUserLanguageList
-
-    # Get the en-US language object
-    $enUS = $languageList | Where-Object { $_.LanguageTag -eq 'en-US' }
-    
-    if ($enUS) {
-        # Clear existing US layouts
-        $enUS.InputMethodTips.Clear()
-        
-        # Add only the custom layout
-        # This is your custom layout, not the standard US-International
-        $enUS.InputMethodTips.Add('0409:A0000409')
+    # Get the correct layout code first
+    $layoutCode = Get-CustomLayoutCode
+    if (-not $layoutCode) {
+        Write-Host "✗ Could not find the Alt Gr dead keys layout. Make sure it's properly installed." -ForegroundColor Red
+        return
     }
 
-    # Apply changes and suppress Windows default warnings
-    $WarningPreference = 'SilentlyContinue'
-    Set-WinUserLanguageList -LanguageList $languageList -Force
-    $WarningPreference = 'Continue'
+    # Remove all other layouts and set our custom one
+    Remove-AllOtherLayouts
 
-    Write-Host "✓ Custom keyboard layout set as default" -ForegroundColor Green
+    # Verify the layout was set correctly
+    $currentLayouts = (Get-WinUserLanguageList)[0].InputMethodTips
+    if ($currentLayouts.Count -eq 1 -and $currentLayouts[0] -eq $layoutCode) {
+        Write-Host "✓ Alt Gr dead keys layout set as the only keyboard layout" -ForegroundColor Green
+    } else {
+        Write-Host "✗ Failed to set layout exclusively" -ForegroundColor Red
+        Write-Host "Current layouts: $($currentLayouts -join ', ')" -ForegroundColor Yellow
+    }
 }
 
 function Set-CustomKeyboardLayout {
@@ -70,6 +142,7 @@ function Set-CustomKeyboardLayout {
             Start-Sleep -Seconds 2
             Set-SingleCustomKeyboard
             Write-Host "`n⚠ Please log off and log back on for changes to take effect" -ForegroundColor Yellow
+            Write-Host "✓ The Alt Gr dead keys layout will be the only layout available" -ForegroundColor Green
             return $true
         }
         return $false

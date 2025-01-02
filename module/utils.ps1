@@ -102,6 +102,16 @@ function Reload-Path {
     }
 }
 
+function Write-Status {
+    param(
+        [string]$Message,
+        [string]$Status,
+        [string]$Color = "Green"
+    )
+    Write-Host "$Message".PadRight(50) -NoNewline
+    Write-Host "[$Status]" -ForegroundColor $Color
+}
+
 function Write-Log {
     param([string]$Message)
     Write-Host "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'): $Message"
@@ -143,13 +153,83 @@ function Restart-Explorer {
     }
 }
 
-# Export additional utility functions
+function Set-StageFlag {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$StageName
+    )
+    
+    try {
+        $flagsDir = Join-Path $PSScriptRoot "..\flags"
+        if (-not (Test-Path $flagsDir)) {
+            New-Item -ItemType Directory -Path $flagsDir -Force | Out-Null
+        }
+        
+        $flagPath = Join-Path $flagsDir "$StageName.txt"
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        $timestamp | Set-Content $flagPath -Force
+        Write-Verbose "Created flag for stage: $StageName"
+        return $true
+    }
+    catch {
+        Write-Error "Failed to create flag file for stage $StageName`: $_"
+        return $false
+    }
+}
+
+function Test-StageFlag {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$StageName
+    )
+    
+    $flagPath = Join-Path $PSScriptRoot "..\flags\$StageName.txt"
+    return Test-Path $flagPath
+}
+
+function Invoke-ExternalCommand {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$Command,
+        [string]$Description,
+        [switch]$UseShell
+    )
+    
+    try {
+        Write-Status "$Description" -Status "Starting" -Color "Yellow"
+        
+        if ($UseShell) {
+            $scriptBlock = [Scriptblock]::Create($Command)
+            $result = & $scriptBlock
+        } else {
+            $result = Invoke-Expression -Command $Command
+        }
+        
+        if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+            Write-Status "$Description" -Status "Failed (Exit: $LASTEXITCODE)" -Color "Red"
+            return $false
+        }
+        
+        Write-Status "$Description" -Status "Completed" -Color "Green"
+        return $true
+    }
+    catch {
+        Write-Status "$Description" -Status "Error: $_" -Color "Red"
+        return $false
+    }
+}
+
+# Export additional functions
 Export-ModuleMember -Function @(
     'Set-Env',
     'Reload-Path',
+    'Write-Status',
     'Write-Log',
     'Set-RegistryValue',
-    'Restart-Explorer'
+    'Restart-Explorer',
+    'Set-StageFlag',
+    'Test-StageFlag',
+    'Invoke-ExternalCommand'
 )
 
 # Example usage:

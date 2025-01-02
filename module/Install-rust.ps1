@@ -1,3 +1,7 @@
+function Test-RustInstallation {
+    return (Test-Command "rustc") -and (Test-Command "cargo")
+}
+
 function Install-Rust {
     Write-Host "Installing Rust via rustup..." -ForegroundColor Green
     
@@ -19,3 +23,8 @@ function Install-Rust {
     rustc --version
     cargo --version
 }
+
+Export-ModuleMember -Function @(
+    'Install-Rust',
+    'Test-RustInstallation'
+)
