@@ -323,16 +323,70 @@ if (-not (Test-StageFlag "yazi-deps")) {
     )
     
     foreach ($dep in $deps) {
-        if (-not (Invoke-ExternalCommand -Command "winget install $dep --silent" `
-                -Description "Installing $dep")) {
-            Handle-Error "Failed to install $dep" "Dependency Installation"
+        Write-Host "Installing $dep..." -ForegroundColor Yellow
+        try {
+            # First check if already installed
+            $checkOutput = winget list --id $dep 2>&1
+            if ($checkOutput -match $dep) {
+                Write-Host "$dep is already installed" -ForegroundColor Green
+                continue
+            }
+
+            # Try to install with detailed error capture
+            $installOutput = winget install --exact --id $dep --accept-source-agreements --accept-package-agreements 2>&1
+            $exitCode = $LASTEXITCODE
+
+            if ($exitCode -ne 0) {
+                $errorDetail = $installOutput | Out-String
+                if (-not (Handle-Error "Failed to install $dep (Exit code: $exitCode)`nInstallation output:`n$errorDetail" "Installing $dep" $Error[0])) {
+                    Write-Host "`nYou can try installing $dep manually using:" -ForegroundColor Yellow
+                    Write-Host "winget install --exact --id $dep" -ForegroundColor Cyan
+                    Exit-Script
+                    return
+                }
+            } else {
+                Write-Host "$dep installation completed successfully" -ForegroundColor Green
+            }
+        }
+        catch {
+            $errorDetail = $_.Exception.Message
+            $stackTrace = $_.ScriptStackTrace
+            if (-not (Handle-Error "Failed to install $dep with error: $errorDetail`nStack trace: $stackTrace" "Installing $dep" $_)) {
+                Write-Host "`nYou can try installing $dep manually using:" -ForegroundColor Yellow
+                Write-Host "winget install --exact --id $dep" -ForegroundColor Cyan
+                Exit-Script
+                return
+            }
         }
     }
     
     # Install rich-cli via pip
-    if (-not (Invoke-ExternalCommand -Command 'python -m pip install rich-cli --quiet' `
-            -Description "Installing rich-cli")) {
-        Handle-Error "Failed to install rich-cli" "rich-cli Installation"
+    try {
+        Write-Host "Installing rich-cli..." -ForegroundColor Yellow
+        $pipOutput = python -m pip install rich-cli --quiet 2>&1
+        $exitCode = $LASTEXITCODE
+
+        if ($exitCode -ne 0) {
+            $errorDetail = $pipOutput | Out-String
+            if (-not (Handle-Error "Failed to install rich-cli (Exit code: $exitCode)`nInstallation output:`n$errorDetail" "rich-cli Installation" $Error[0])) {
+                Write-Host "`nYou can try installing rich-cli manually using:" -ForegroundColor Yellow
+                Write-Host "python -m pip install rich-cli" -ForegroundColor Cyan
+                Exit-Script
+                return
+            }
+        } else {
+            Write-Host "rich-cli installation completed successfully" -ForegroundColor Green
+        }
+    }
+    catch {
+        $errorDetail = $_.Exception.Message
+        $stackTrace = $_.ScriptStackTrace
+        if (-not (Handle-Error "Failed to install rich-cli with error: $errorDetail`nStack trace: $stackTrace" "rich-cli Installation" $_)) {
+            Write-Host "`nYou can try installing rich-cli manually using:" -ForegroundColor Yellow
+            Write-Host "python -m pip install rich-cli" -ForegroundColor Cyan
+            Exit-Script
+            return
+        }
     }
     
     # Reload PATH after installing all dependencies
