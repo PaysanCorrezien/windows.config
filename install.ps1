@@ -627,25 +627,54 @@ if (-not (Test-StageFlag "opener-setup")) {
     
     # Add scripts to PATH
     $scriptsPath = Join-Path $PSScriptRoot "scripts"
+    if (-not (Test-Path $scriptsPath)) {
+        Write-Host "Creating scripts directory..." -ForegroundColor Yellow
+        New-Item -ItemType Directory -Path $scriptsPath -Force | Out-Null
+    }
+
+    # Verify nvim-wezterm.bat exists
+    $nvimWeztermPath = Join-Path $scriptsPath "nvim-wezterm.bat"
+    if (-not (Test-Path $nvimWeztermPath)) {
+        Write-Warning "nvim-wezterm.bat not found at: $nvimWeztermPath"
+        Write-Host "Please ensure the file exists before continuing." -ForegroundColor Yellow
+        if (-not (Handle-Error "Required file nvim-wezterm.bat is missing" "Opener Setup")) {
+            Exit-Script
+            return
+        }
+    }
+    
+    # Add scripts to PATH
     if (-not (Invoke-ExternalCommand -Command "Set-Env -Name 'PATH' -Value '$scriptsPath' -Scope 'Machine' -Verbose" `
             -Description "Adding scripts to PATH")) {
-        Handle-Error "Failed to add scripts to PATH" "Scripts to PATH"
+        if (-not (Handle-Error "Failed to add scripts to PATH" "Scripts to PATH")) {
+            Exit-Script
+            return
+        }
     }
     
     # Set Neovim as default editor
     if (-not (Invoke-ExternalCommand -Command "[System.Environment]::SetEnvironmentVariable('EDITOR', 'nvim', [System.EnvironmentVariableTarget]::Machine)" `
             -Description "Setting Neovim as default editor")) {
-        Handle-Error "Failed to set Neovim as default editor" "Neovim as default editor"
+        if (-not (Handle-Error "Failed to set Neovim as default editor" "Neovim as default editor")) {
+            Exit-Script
+            return
+        }
     }
     
     # Add context menu entries
     if (-not (Add-NeovimContextMenu -Verbose)) {
-        Handle-Error "Failed to add context menu entries" "Context menu entries"
+        if (-not (Handle-Error "Failed to add context menu entries. Please check if nvim-wezterm.bat exists in the scripts directory." "Context menu entries")) {
+            Exit-Script
+            return
+        }
     }
     
     # Set file associations
     if (-not (Set-FileAssociation -FileExtensions @("txt", "md", "json", "js", "py", "lua", "vim", "sh", "bat", "ps1", "config", "yml", "yaml", "xml", "ini", "conf", "log") -Verbose)) {
-        Handle-Error "Failed to set file associations" "File associations"
+        if (-not (Handle-Error "Failed to set file associations" "File associations")) {
+            Exit-Script
+            return
+        }
     }
     
     # Reload PATH to ensure changes are available
