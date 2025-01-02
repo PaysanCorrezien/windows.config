@@ -4,11 +4,13 @@ Set-StrictMode -Version 3.0
 
 # Import required modules
 $modulePath = Join-Path $PSScriptRoot "module"
-. "$modulePath\utils.ps1"
-. "$modulePath\styles.ps1"
-. "$modulePath\setup-neovim-menu-entry.ps1"
-. "$modulePath\keyboard-layout.ps1"
-. "$modulePath\Install-rust.ps1"
+
+# Create a new scope for the imports to avoid namespace pollution
+$script:utils = . "$modulePath\utils.ps1"
+$script:styles = . "$modulePath\styles.ps1"
+$script:neovimMenu = . "$modulePath\setup-neovim-menu-entry.ps1"
+$script:keyboardLayout = . "$modulePath\keyboard-layout.ps1"
+$script:rustInstall = . "$modulePath\Install-rust.ps1"
 
 function Get-UserConfirmation {
     param (

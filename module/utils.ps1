@@ -219,18 +219,18 @@ function Invoke-ExternalCommand {
     }
 }
 
-# Export additional functions
-Export-ModuleMember -Function @(
-    'Set-Env',
-    'Reload-Path',
-    'Write-Status',
-    'Write-Log',
-    'Set-RegistryValue',
-    'Restart-Explorer',
-    'Set-StageFlag',
-    'Test-StageFlag',
-    'Invoke-ExternalCommand'
-)
+# Return a hashtable of functions instead of using Export-ModuleMember
+@{
+    'Set-Env' = ${function:Set-Env}
+    'Reload-Path' = ${function:Reload-Path}
+    'Write-Status' = ${function:Write-Status}
+    'Write-Log' = ${function:Write-Log}
+    'Set-RegistryValue' = ${function:Set-RegistryValue}
+    'Restart-Explorer' = ${function:Restart-Explorer}
+    'Set-StageFlag' = ${function:Set-StageFlag}
+    'Test-StageFlag' = ${function:Test-StageFlag}
+    'Invoke-ExternalCommand' = ${function:Invoke-ExternalCommand}
+}
 
 # Example usage:
 # Set-Env -Name 'PATH' -Value 'C:\Users\admin\AppData\Local\Microsoft\WinGet\Packages\sxyazi.yazi_Microsoft.Winget.Source_8wekyb3d8bbwe\yazi-x86_64-pc-windows-msvc' -Scope 'User' -Verbose

@@ -1,4 +1,4 @@
-t# Import utility functions from utils.ps1
+# Import utility functions from utils.ps1
 . "$PSScriptRoot\utils.ps1"
 
 function Hide-Taskbar {
@@ -112,10 +112,10 @@ function Set-Fonts {
     }
 }
 
-# Export the style-related functions
-Export-ModuleMember -Function @(
-    'Set-WindowsStyle',
-    'Hide-Taskbar',
-    'Hide-DesktopIcons',
-    'Set-Fonts'
-)
+# Return a hashtable of functions instead of using Export-ModuleMember
+@{
+    'Set-WindowsStyle' = ${function:Set-WindowsStyle}
+    'Hide-Taskbar' = ${function:Hide-Taskbar}
+    'Hide-DesktopIcons' = ${function:Hide-DesktopIcons}
+    'Set-Fonts' = ${function:Set-Fonts}
+}
