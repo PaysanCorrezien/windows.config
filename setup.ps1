@@ -13,7 +13,18 @@ function Test-AdminPrivileges {
 function Request-AdminPrivileges {
     if (-not (Test-AdminPrivileges)) {
         Write-Host "Requesting administrative privileges..." -ForegroundColor Yellow
-        Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Wait
+        $scriptPath = $PSCommandPath
+        if (-not $scriptPath) {
+            # If running from irm, save the script first
+            $tempScript = Join-Path $env:TEMP "windows-config-setup.ps1"
+            $scriptContent = Invoke-RestMethod "https://raw.githubusercontent.com/paysancorrezien/windows.config/master/setup.ps1"
+            Set-Content -Path $tempScript -Value $scriptContent
+            $scriptPath = $tempScript
+        }
+        Start-Process powershell.exe -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"" -Wait
+        if ($tempScript) {
+            Remove-Item $tempScript -ErrorAction SilentlyContinue
+        }
         exit
     }
 }

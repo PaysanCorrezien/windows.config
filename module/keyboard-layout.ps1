@@ -58,7 +58,7 @@ function Get-CustomLayoutCode {
     foreach ($lang in $layouts) {
         foreach ($layout in $lang.InputMethodTips) {
             # Look specifically for the Alt Gr dead keys layout
-            if ($layout -match 'Alt Gr dead keys|ALTGR') {
+            if ($layout -match 'Alt Gr dead keys|ALTGR|d0010409') {
                 Write-Host "Found custom layout: $layout" -ForegroundColor Cyan
                 return $layout
             }
@@ -71,16 +71,21 @@ function Get-CustomLayoutCode {
         # Check both Layout File and Layout Display Name properties
         $layoutFile = $layout.PSObject.Properties['Layout File']?.Value
         $layoutName = $layout.PSObject.Properties['Layout Display Name']?.Value
+        $layoutId = $layout.PSChildName
         
-        if (($layoutFile -and $layoutFile -match 'Alt Gr dead keys|ALTGR') -or 
-            ($layoutName -and $layoutName -match 'Alt Gr dead keys|ALTGR')) {
-            $code = "0409:$($layout.PSChildName)"
+        if (($layoutFile -and $layoutFile -match 'ALTGR') -or 
+            ($layoutName -and $layoutName -match 'Alt Gr dead keys|ALTGR') -or
+            $layoutId -eq 'd0010409') {
+            $code = "0409:$layoutId"
             Write-Host "Found custom layout in registry: $code" -ForegroundColor Cyan
             return $code
         }
     }
-    Write-Host "✗ Could not find Alt Gr dead keys layout" -ForegroundColor Red
-    return $null
+
+    # Last resort: check for the known layout ID directly
+    $knownLayoutId = "0409:d0010409"
+    Write-Host "Trying known layout ID: $knownLayoutId" -ForegroundColor Yellow
+    return $knownLayoutId
 }
 
 function Remove-AllOtherLayouts {
