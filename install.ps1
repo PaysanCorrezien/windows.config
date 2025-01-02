@@ -285,15 +285,28 @@ if (-not (Test-StageFlag "yazi-deps")) {
     # Install Yazi
     try {
         Write-Host "Installing Yazi..." -ForegroundColor Yellow
-        $result = Invoke-ExternalCommand -Command 'winget install sxyazi.yazi' `
-            -Description "Installing Yazi"
-        if (-not $result) {
-            $lastError = $Error[0]
-            Handle-Error "Failed to install Yazi. Exit code: $LASTEXITCODE" "Yazi Installation" $lastError
+        
+        # First check if Yazi is already installed
+        $yaziCheck = winget list --id sxyazi.yazi 2>&1
+        if ($yaziCheck -match "sxyazi.yazi") {
+            Write-Host "Yazi is already installed" -ForegroundColor Green
+        } else {
+            # Try to install Yazi with more detailed error capture
+            $installOutput = winget install --exact --id sxyazi.yazi --accept-source-agreements 2>&1
+            $exitCode = $LASTEXITCODE
+
+            if ($exitCode -ne 0) {
+                $errorDetail = $installOutput | Out-String
+                Handle-Error "Failed to install Yazi (Exit code: $exitCode)`nInstallation output:`n$errorDetail" "Yazi Installation" $Error[0]
+            } else {
+                Write-Host "Yazi installation completed successfully" -ForegroundColor Green
+            }
         }
     }
     catch {
-        Handle-Error "Failed to install Yazi: $_" "Yazi Installation" $_
+        $errorDetail = $_.Exception.Message
+        $stackTrace = $_.ScriptStackTrace
+        Handle-Error "Failed to install Yazi with error: $errorDetail`nStack trace: $stackTrace" "Yazi Installation" $_
     }
     
     # Install dependencies
