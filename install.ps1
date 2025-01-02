@@ -117,45 +117,57 @@ Write-Status "Style settings" -Status "Applied" -Color "Green"
 if (-not (Test-ScoopInstallation)) {
     Write-Status "Installing Scoop..." -Status "Starting" -Color "Yellow"
     
-    # Store current location and privileges
-    $currentLocation = Get-Location
-    $isAdmin = Test-AdminPrivileges
-    
     try {
-        # If running as admin, we need to drop privileges for Scoop installation
-        if ($isAdmin) {
-            Write-Host "Dropping admin privileges for Scoop installation..." -ForegroundColor Yellow
-            $processInfo = New-Object System.Diagnostics.ProcessStartInfo
-            $processInfo.FileName = "powershell.exe"
-            $processInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command `"Set-ExecutionPolicy RemoteSigned -Scope CurrentUser; irm get.scoop.sh | iex`""
-            $processInfo.UseShellExecute = $true
-            $processInfo.Verb = "runas"
-            $process = [System.Diagnostics.Process]::Start($processInfo)
-            $process.WaitForExit()
-            
-            if ($process.ExitCode -ne 0) {
-                throw "Scoop installation failed with exit code: $($process.ExitCode)"
-            }
-        } else {
-            # Set execution policy and install Scoop
-            Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-            Invoke-RestMethod -Uri get.scoop.sh | Invoke-Expression
+        # Create a temporary script file for Scoop installation
+        $tempScriptPath = Join-Path $env:TEMP "install-scoop.ps1"
+        @'
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+Invoke-RestMethod -Uri get.scoop.sh | Invoke-Expression
+'@ | Set-Content -Path $tempScriptPath
+
+        # Start a new non-elevated PowerShell process to run the script
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = "powershell.exe"
+        $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$tempScriptPath`""
+        $startInfo.UseShellExecute = $true
+        $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Normal
+        
+        Write-Host "Starting Scoop installation in a new window. Please wait for it to complete..." -ForegroundColor Yellow
+        $process = [System.Diagnostics.Process]::Start($startInfo)
+        $process.WaitForExit()
+
+        # Clean up the temporary script
+        Remove-Item -Path $tempScriptPath -Force -ErrorAction SilentlyContinue
+
+        if ($process.ExitCode -ne 0) {
+            throw "Scoop installation process exited with code: $($process.ExitCode)"
         }
-        
-        # Reload PATH
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-        
+
+        # Verify Scoop installation
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+        if (-not (Get-Command "scoop" -ErrorAction SilentlyContinue)) {
+            throw "Scoop command not found after installation"
+        }
+
         # Add main bucket
-        if (-not (Invoke-ExternalCommand -Command 'scoop bucket add main' `
-                -Description "Adding Scoop main bucket")) {
-            Write-Error "Failed to add Scoop main bucket"
-            exit 1
+        Write-Host "Adding Scoop main bucket..." -ForegroundColor Yellow
+        if (-not (Invoke-ExternalCommand -Command 'scoop bucket add main' -Description "Adding Scoop main bucket")) {
+            throw "Failed to add Scoop main bucket"
         }
         
         Write-Status "Scoop installation" -Status "Completed" -Color "Green"
-    } finally {
-        # Restore location
-        Set-Location $currentLocation
+    }
+    catch {
+        Write-Warning "Error during Scoop installation: $_"
+        Write-Host "`nIf the installation failed, you can try installing Scoop manually:" -ForegroundColor Yellow
+        Write-Host "1. Open a new PowerShell window (non-admin)" -ForegroundColor Yellow
+        Write-Host "2. Run this command:" -ForegroundColor Yellow
+        Write-Host "   irm get.scoop.sh | iex" -ForegroundColor Cyan
+        
+        if (-not (Get-UserConfirmation "Would you like to continue with the rest of the installation?")) {
+            exit 1
+        }
     }
 } else {
     Write-Status "Scoop" -Status "Already installed" -Color "Green"
