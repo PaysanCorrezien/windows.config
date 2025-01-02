@@ -105,13 +105,18 @@ if (-not (Test-KeyboardLayout)) {
 }
 
 # 4. Style Settings
-Write-Status "Applying style settings..." -Status "In Progress" -Color "Yellow"
-Set-WindowsStyle -HideTaskbar -HideDesktopIcons
-if (-not $?) {
-    Write-Error "Failed to apply style settings"
-    exit 1
+if (-not (Test-StageFlag "style-settings")) {
+    Write-Status "Applying style settings..." -Status "In Progress" -Color "Yellow"
+    Set-WindowsStyle -HideTaskbar -HideDesktopIcons
+    if (-not $?) {
+        Write-Error "Failed to apply style settings"
+        exit 1
+    }
+    Set-StageFlag "style-settings"
+    Write-Status "Style settings" -Status "Applied" -Color "Green"
+} else {
+    Write-Status "Style settings" -Status "Already configured" -Color "Green"
 }
-Write-Status "Style settings" -Status "Applied" -Color "Green"
 
 # 5. Scoop Installation
 if (-not (Test-ScoopInstallation)) {
@@ -121,7 +126,6 @@ if (-not (Test-ScoopInstallation)) {
         # Create a temporary script file for Scoop installation
         $tempScriptPath = Join-Path $env:TEMP "install-scoop.ps1"
         @'
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
 Invoke-RestMethod -Uri get.scoop.sh | Invoke-Expression
 '@ | Set-Content -Path $tempScriptPath
@@ -129,7 +133,7 @@ Invoke-RestMethod -Uri get.scoop.sh | Invoke-Expression
         # Start a new non-elevated PowerShell process to run the script
         $startInfo = New-Object System.Diagnostics.ProcessStartInfo
         $startInfo.FileName = "powershell.exe"
-        $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$tempScriptPath`""
+        $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command `"& '$tempScriptPath'`""
         $startInfo.UseShellExecute = $true
         $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Normal
         
