@@ -41,24 +41,24 @@ function Clone-Repository {
         Write-Host "Repository directory already exists at $repoPath" -ForegroundColor Yellow
         Write-Host "Updating repository with latest changes..." -ForegroundColor Yellow
         
-        # Store current location
-        $currentLocation = Get-Location
-        
-        # Change to repo directory and update
-        Set-Location $repoPath
-        git pull | Out-Host
-        
-        # Check git pull result
-        if (-not $?) {
-            Set-Location $currentLocation
-            Write-Error "Failed to update repository"
+        Push-Location $repoPath
+        try {
+            # Capture git output but don't let it interfere with the pipeline
+            $gitOutput = git pull 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                throw "Git pull failed: $gitOutput"
+            }
+            Write-Host $gitOutput
+            Write-Host "Repository updated successfully" -ForegroundColor Green
+        }
+        catch {
+            Write-Error "Failed to update repository: $_"
             exit 1
         }
+        finally {
+            Pop-Location
+        }
         
-        # Restore location
-        Set-Location $currentLocation
-        
-        Write-Host "Repository updated successfully" -ForegroundColor Green
         return $repoPath
     }
     
@@ -69,14 +69,16 @@ function Clone-Repository {
     }
     
     Write-Host "Cloning repository to $repoPath..." -ForegroundColor Yellow
-    git clone https://github.com/paysancorrezien/windows.config.git $repoPath
     
-    if (-not $?) {
-        Write-Error "Failed to clone repository"
+    # Capture git clone output
+    $gitOutput = git clone https://github.com/paysancorrezien/windows.config.git $repoPath 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Failed to clone repository: $gitOutput"
         exit 1
     }
-    
+    Write-Host $gitOutput
     Write-Host "Repository cloned successfully" -ForegroundColor Green
+    
     return $repoPath
 }
 
