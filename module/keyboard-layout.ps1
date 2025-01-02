@@ -88,11 +88,29 @@ function Get-CustomLayoutCode {
     return $knownLayoutId
 }
 
+function Ensure-EnglishLanguage {
+    Write-Host "Ensuring US English language is available..." -ForegroundColor Yellow
+    $languageList = Get-WinUserLanguageList
+    
+    # Check if English US is already in the list
+    $enUS = $languageList | Where-Object { $_.LanguageTag -eq 'en-US' }
+    if (-not $enUS) {
+        Write-Host "Adding US English to language list..." -ForegroundColor Yellow
+        $enUS = New-WinUserLanguageList en-US
+        $languageList.Add($enUS[0])
+        Set-WinUserLanguageList $languageList -Force
+    }
+    return $true
+}
+
 function Remove-AllOtherLayouts {
     # Remove all other keyboard layouts from registry
     $customLayout = Get-CustomLayoutCode
     if (-not $customLayout) { return }
 
+    # Ensure we have US English
+    Ensure-EnglishLanguage
+    
     # Remove from current user
     $userLayoutPath = "HKCU:\Keyboard Layout\Preload"
     if (Test-Path $userLayoutPath) {
@@ -124,11 +142,16 @@ function Remove-AllOtherLayouts {
     # Also remove from language list
     $languageList = Get-WinUserLanguageList
     $enUS = $languageList | Where-Object { $_.LanguageTag -eq 'en-US' }
-    if ($enUS) {
-        $enUS.InputMethodTips.Clear()
-        $enUS.InputMethodTips.Add($customLayout)
-        Set-WinUserLanguageList -LanguageList $languageList -Force
+    if (-not $enUS) {
+        $enUS = New-WinUserLanguageList en-US
+        $languageList.Add($enUS[0])
     }
+    $enUS.InputMethodTips.Clear()
+    $enUS.InputMethodTips.Add($customLayout)
+    
+    # Remove other languages
+    $languageList = @($enUS)
+    Set-WinUserLanguageList $languageList -Force
 }
 
 function Set-SingleCustomKeyboard {
@@ -163,6 +186,9 @@ function Set-CustomKeyboardLayout {
     )
 
     try {
+        # Ensure US English is available first
+        Ensure-EnglishLanguage
+        
         if (Install-CustomLayout -MsiPath $MsiPath) {
             # Wait for the layout to be registered
             Write-Host "Waiting for layout to be registered..." -ForegroundColor Yellow
@@ -176,6 +202,14 @@ function Set-CustomKeyboardLayout {
                 
                 # Refresh language list
                 $languageList = Get-WinUserLanguageList
+                
+                # Ensure US English is still there and has our layout
+                $enUS = $languageList | Where-Object { $_.LanguageTag -eq 'en-US' }
+                if (-not $enUS) {
+                    $enUS = New-WinUserLanguageList en-US
+                    $languageList.Add($enUS[0])
+                }
+                
                 Set-WinUserLanguageList $languageList -Force
                 
                 # Check registry directly
