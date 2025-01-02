@@ -21,6 +21,7 @@ ${function:Invoke-ExternalCommand} = $utils['Invoke-ExternalCommand']
 ${function:Set-Env} = $utils['Set-Env']
 ${function:Reload-Path} = $utils['Reload-Path']
 ${function:Test-Command} = $utils['Test-Command']
+${function:Install-WithWinget} = $utils['Install-WithWinget']
 
 function Get-UserConfirmation {
     param (
@@ -253,16 +254,13 @@ if (-not (Test-StageFlag "yazi-deps")) {
     # Check for Python
     if (-not (Test-Command "python")) {
         Write-Status "Python not found. Installing Python..." -Status "Starting" -Color "Yellow"
-        try {
-            if (-not (Invoke-ExternalCommand -Command 'winget install Python.Python.3.11' `
-                    -Description "Installing Python")) {
-                Handle-Error "Failed to install Python" "Python Installation" $Error[0]
+        if (-not (Install-WithWinget -PackageId "Python.Python.3.11")) {
+            if (-not (Handle-Error "Failed to install Python" "Python Installation" $Error[0])) {
+                Exit-Script
+                return
+            }
             }
             Reload-Path
-        }
-        catch {
-            Handle-Error "Failed to install Python: $_" "Python Installation" $_
-        }
     }
     
     # Add Git usr/bin to PATH for Yazi
@@ -283,30 +281,11 @@ if (-not (Test-StageFlag "yazi-deps")) {
     }
     
     # Install Yazi
-    try {
-        Write-Host "Installing Yazi..." -ForegroundColor Yellow
-        
-        # First check if Yazi is already installed
-        $yaziCheck = winget list --id sxyazi.yazi 2>&1
-        if ($yaziCheck -match "sxyazi.yazi") {
-            Write-Host "Yazi is already installed" -ForegroundColor Green
-        } else {
-            # Try to install Yazi with more detailed error capture
-            $installOutput = winget install --exact --id sxyazi.yazi --accept-source-agreements 2>&1
-            $exitCode = $LASTEXITCODE
-
-            if ($exitCode -ne 0) {
-                $errorDetail = $installOutput | Out-String
-                Handle-Error "Failed to install Yazi (Exit code: $exitCode)`nInstallation output:`n$errorDetail" "Yazi Installation" $Error[0]
-            } else {
-                Write-Host "Yazi installation completed successfully" -ForegroundColor Green
-            }
+    if (-not (Install-WithWinget -PackageId "sxyazi.yazi")) {
+        if (-not (Handle-Error "Failed to install Yazi" "Yazi Installation" $Error[0])) {
+            Exit-Script
+            return
         }
-    }
-    catch {
-        $errorDetail = $_.Exception.Message
-        $stackTrace = $_.ScriptStackTrace
-        Handle-Error "Failed to install Yazi with error: $errorDetail`nStack trace: $stackTrace" "Yazi Installation" $_
     }
     
     # Install dependencies
@@ -323,35 +302,8 @@ if (-not (Test-StageFlag "yazi-deps")) {
     )
     
     foreach ($dep in $deps) {
-        Write-Host "Installing $dep..." -ForegroundColor Yellow
-        try {
-            # First check if already installed
-            $checkOutput = winget list --id $dep 2>&1
-            if ($checkOutput -match $dep) {
-                Write-Host "$dep is already installed" -ForegroundColor Green
-                continue
-            }
-
-            # Try to install with detailed error capture
-            $installOutput = winget install --exact --id $dep --accept-source-agreements --accept-package-agreements 2>&1
-            $exitCode = $LASTEXITCODE
-
-            if ($exitCode -ne 0) {
-                $errorDetail = $installOutput | Out-String
-                if (-not (Handle-Error "Failed to install $dep (Exit code: $exitCode)`nInstallation output:`n$errorDetail" "Installing $dep" $Error[0])) {
-                    Write-Host "`nYou can try installing $dep manually using:" -ForegroundColor Yellow
-                    Write-Host "winget install --exact --id $dep" -ForegroundColor Cyan
-                    Exit-Script
-                    return
-                }
-            } else {
-                Write-Host "$dep installation completed successfully" -ForegroundColor Green
-            }
-        }
-        catch {
-            $errorDetail = $_.Exception.Message
-            $stackTrace = $_.ScriptStackTrace
-            if (-not (Handle-Error "Failed to install $dep with error: $errorDetail`nStack trace: $stackTrace" "Installing $dep" $_)) {
+        if (-not (Install-WithWinget -PackageId $dep)) {
+            if (-not (Handle-Error "Failed to install $dep" "Installing $dep" $Error[0])) {
                 Write-Host "`nYou can try installing $dep manually using:" -ForegroundColor Yellow
                 Write-Host "winget install --exact --id $dep" -ForegroundColor Cyan
                 Exit-Script
@@ -410,19 +362,10 @@ if (-not (Test-StageFlag "nextcloud-setup")) {
         } else {
             # Try to install with detailed error capture
             Write-Host "Installing Nextcloud..." -ForegroundColor Yellow
-            $installOutput = winget install --exact --id Nextcloud.NextcloudDesktop --accept-source-agreements --accept-package-agreements 2>&1
-            $exitCode = $LASTEXITCODE
-
-            if ($exitCode -ne 0) {
-                $errorDetail = $installOutput | Out-String
-                if (-not (Handle-Error "Failed to install Nextcloud (Exit code: $exitCode)`nInstallation output:`n$errorDetail" "Nextcloud Installation" $Error[0])) {
-                    Write-Host "`nYou can try installing Nextcloud manually using:" -ForegroundColor Yellow
-                    Write-Host "winget install --exact --id Nextcloud.NextcloudDesktop" -ForegroundColor Cyan
+            if (-not (Install-WithWinget -PackageId "Nextcloud.NextcloudDesktop")) {
+                if (-not (Handle-Error "Failed to install Nextcloud" "Nextcloud Installation" $Error[0])) {
                     Exit-Script
                     return
-                }
-            } else {
-                Write-Host "Nextcloud installation completed successfully" -ForegroundColor Green
             }
         }
 
@@ -439,6 +382,7 @@ if (-not (Test-StageFlag "nextcloud-setup")) {
             if (-not (Handle-Error "Nextcloud setup was not completed successfully" "Nextcloud Setup")) {
                 Exit-Script
                 return
+                }
             }
         }
     }
@@ -468,19 +412,10 @@ if (-not (Test-StageFlag "uniget-setup")) {
         } else {
             # Try to install with detailed error capture
             Write-Host "Installing UniGet UI..." -ForegroundColor Yellow
-            $installOutput = winget install --exact --id MartiCliment.UniGetUI --source winget --accept-source-agreements --accept-package-agreements 2>&1
-            $exitCode = $LASTEXITCODE
-
-            if ($exitCode -ne 0) {
-                $errorDetail = $installOutput | Out-String
-                if (-not (Handle-Error "Failed to install UniGet UI (Exit code: $exitCode)`nInstallation output:`n$errorDetail" "UniGet UI Installation" $Error[0])) {
-                    Write-Host "`nYou can try installing UniGet UI manually using:" -ForegroundColor Yellow
-                    Write-Host "winget install --exact --id MartiCliment.UniGetUI --source winget" -ForegroundColor Cyan
+            if (-not (Install-WithWinget -PackageId "MartiCliment.UniGetUI" -Source "winget")) {
+                if (-not (Handle-Error "Failed to install UniGet UI" "UniGet UI Installation" $Error[0])) {
                     Exit-Script
                     return
-                }
-            } else {
-                Write-Host "UniGet UI installation completed successfully" -ForegroundColor Green
             }
         }
 
@@ -497,6 +432,7 @@ if (-not (Test-StageFlag "uniget-setup")) {
             if (-not (Handle-Error "UniGet UI setup was not completed successfully" "UniGet UI Setup")) {
                 Exit-Script
                 return
+                }
             }
         }
     }
@@ -551,19 +487,10 @@ if (-not (Test-StageFlag "keepassxc-setup")) {
         } else {
             # Try to install with detailed error capture
             Write-Host "Installing KeePassXC..." -ForegroundColor Yellow
-            $installOutput = winget install --exact --id KeePassXCTeam.KeePassXC --accept-source-agreements --accept-package-agreements 2>&1
-            $exitCode = $LASTEXITCODE
-
-            if ($exitCode -ne 0) {
-                $errorDetail = $installOutput | Out-String
-                if (-not (Handle-Error "Failed to install KeePassXC (Exit code: $exitCode)`nInstallation output:`n$errorDetail" "KeePassXC Installation" $Error[0])) {
-                    Write-Host "`nYou can try installing KeePassXC manually using:" -ForegroundColor Yellow
-                    Write-Host "winget install --exact --id KeePassXCTeam.KeePassXC" -ForegroundColor Cyan
+            if (-not (Install-WithWinget -PackageId "KeePassXCTeam.KeePassXC")) {
+                if (-not (Handle-Error "Failed to install KeePassXC" "KeePassXC Installation" $Error[0])) {
                     Exit-Script
                     return
-                }
-            } else {
-                Write-Host "KeePassXC installation completed successfully" -ForegroundColor Green
             }
         }
 
@@ -580,6 +507,7 @@ if (-not (Test-StageFlag "keepassxc-setup")) {
             if (-not (Handle-Error "KeePassXC setup was not completed successfully" "KeePassXC Setup")) {
                 Exit-Script
                 return
+                }
             }
         }
     }
@@ -602,9 +530,11 @@ if (-not (Test-StageFlag "gpg-setup")) {
     Write-Status "Installing GnuPG..." -Status "Starting" -Color "Yellow"
     
     # Install GnuPG
-    if (-not (Invoke-ExternalCommand -Command 'winget install GnuPG.GnuPG' `
-            -Description "Installing GnuPG")) {
-        Handle-Error "Failed to install GnuPG" "GnuPG Installation"
+    if (-not (Install-WithWinget -PackageId "GnuPG.GnuPG")) {
+        if (-not (Handle-Error "Failed to install GnuPG" "GnuPG Installation" $Error[0])) {
+            Exit-Script
+            return
+        }
     }
     
     # Reload PATH after GPG installation
@@ -613,7 +543,10 @@ if (-not (Test-StageFlag "gpg-setup")) {
     # Configure Git to use GPG
     if (-not (Invoke-ExternalCommand -Command 'git config --global gpg.program "C:\Program Files (x86)\GnuPG\bin\gpg.exe"' `
             -Description "Configuring Git GPG")) {
-        Handle-Error "Failed to configure Git GPG" "Git GPG Configuration"
+        if (-not (Handle-Error "Failed to configure Git GPG" "Git GPG Configuration")) {
+            Exit-Script
+            return
+        }
     }
     
     Write-Host "`nPlease complete GPG setup:" -ForegroundColor Yellow
@@ -627,7 +560,10 @@ if (-not (Test-StageFlag "gpg-setup")) {
         Set-StageFlag "gpg-setup"
         Write-Status "GPG setup" -Status "Completed" -Color "Green"
     } else {
-        Handle-Error "GPG setup was not completed successfully" "GPG Setup"
+        if (-not (Handle-Error "GPG setup was not completed successfully" "GPG Setup")) {
+            Exit-Script
+            return
+        }
     }
 } else {
     Write-Status "GPG" -Status "Already configured" -Color "Green"
@@ -726,9 +662,11 @@ if (-not (Test-StageFlag "chatgpt-setup")) {
     Write-Status "Installing ChatGPT Desktop..." -Status "Starting" -Color "Yellow"
     
     # Install ChatGPT
-    if (-not (Invoke-ExternalCommand -Command 'winget install --id=OpenAI.ChatGPT' `
-            -Description "Installing ChatGPT Desktop")) {
-        Handle-Error "Failed to install ChatGPT" "ChatGPT Installation"
+    if (-not (Install-WithWinget -PackageId "OpenAI.ChatGPT")) {
+        if (-not (Handle-Error "Failed to install ChatGPT" "ChatGPT Installation" $Error[0])) {
+            Exit-Script
+            return
+        }
     }
     
     Write-Host "`nPlease configure ChatGPT:" -ForegroundColor Yellow
@@ -751,9 +689,11 @@ if (-not (Test-StageFlag "todoist-setup")) {
     Write-Status "Installing Todoist..." -Status "Starting" -Color "Yellow"
     
     # Install Todoist
-    if (-not (Invoke-ExternalCommand -Command 'winget install --id Doist.Todoist' `
-            -Description "Installing Todoist")) {
-        Handle-Error "Failed to install Todoist" "Todoist Installation"
+    if (-not (Install-WithWinget -PackageId "Doist.Todoist")) {
+        if (-not (Handle-Error "Failed to install Todoist" "Todoist Installation" $Error[0])) {
+            Exit-Script
+            return
+        }
     }
     
     Write-Host "`nPlease configure Todoist:" -ForegroundColor Yellow
@@ -777,9 +717,11 @@ if (-not (Test-StageFlag "powertoys-setup")) {
     Write-Status "Installing PowerToys..." -Status "Starting" -Color "Yellow"
     
     # Install PowerToys
-    if (-not (Invoke-ExternalCommand -Command 'winget install --id Microsoft.PowerToys' `
-            -Description "Installing PowerToys")) {
-        Handle-Error "Failed to install PowerToys" "PowerToys Installation"
+    if (-not (Install-WithWinget -PackageId "Microsoft.PowerToys")) {
+        if (-not (Handle-Error "Failed to install PowerToys" "PowerToys Installation" $Error[0])) {
+            Exit-Script
+            return
+        }
     }
     
     # Reload PATH after PowerToys installation
@@ -845,9 +787,11 @@ if (-not (Test-StageFlag "personal-repos-setup")) {
     
     # Setup Chezmoi
     if (-not (Test-Command "chezmoi")) {
-        if (-not (Invoke-ExternalCommand -Command "winget install --id twpayne.chezmoi" `
-                -Description "Installing Chezmoi")) {
-            Handle-Error "Failed to install Chezmoi" "Chezmoi Installation"
+        if (-not (Install-WithWinget -PackageId "twpayne.chezmoi")) {
+            if (-not (Handle-Error "Failed to install Chezmoi" "Chezmoi Installation" $Error[0])) {
+                Exit-Script
+                return
+            }
         }
         
         # Reload PATH to ensure chezmoi is available

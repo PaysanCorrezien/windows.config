@@ -223,19 +223,79 @@ function Test-Command($cmdname) {
     return [bool](Get-Command -Name $cmdname -ErrorAction SilentlyContinue)
 }
 
-# Return a hashtable of functions
-@{
-    'Set-Env' = ${function:Set-Env}
-    'Reload-Path' = ${function:Reload-Path}
+function Install-WithWinget {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$PackageId,
+        [string]$Source = "winget",
+        [string[]]$AdditionalArguments = @(),
+        [switch]$NoCheckAlreadyInstalled
+    )
+
+    try {
+        # First check if already installed (unless explicitly skipped)
+        if (-not $NoCheckAlreadyInstalled) {
+            $checkOutput = winget list --id $PackageId 2>&1
+            if ($checkOutput -match $PackageId) {
+                Write-Host "$PackageId is already installed" -ForegroundColor Green
+                return $true
+            }
+        }
+
+        # Build the installation command
+        $baseArgs = @(
+            "install",
+            "--exact",
+            "--id",
+            $PackageId,
+            "--accept-source-agreements",
+            "--accept-package-agreements"
+        )
+        
+        if ($Source -ne "winget") {
+            $baseArgs += @("--source", $Source)
+        }
+        
+        $baseArgs += $AdditionalArguments
+        
+        # Try to install with detailed error capture
+        Write-Host "Installing $PackageId..." -ForegroundColor Yellow
+        $installOutput = & winget $baseArgs 2>&1
+        $exitCode = $LASTEXITCODE
+
+        if ($exitCode -ne 0) {
+            $errorDetail = $installOutput | Out-String
+            $errorMessage = "Failed to install $PackageId (Exit code: $exitCode)`nInstallation output:`n$errorDetail"
+            Write-Host "`nYou can try installing $PackageId manually using:" -ForegroundColor Yellow
+            Write-Host "winget install --exact --id $PackageId $(if($Source -ne 'winget'){`"--source $Source`"})" -ForegroundColor Cyan
+            throw $errorMessage
+        }
+
+        Write-Host "$PackageId installation completed successfully" -ForegroundColor Green
+        return $true
+    }
+    catch {
+        $errorDetail = $_.Exception.Message
+        $stackTrace = $_.ScriptStackTrace
+        Write-Error "Failed to install $PackageId with error: $errorDetail`nStack trace: $stackTrace"
+        return $false
+    }
+}
+
+# Export functions
+$exports = @{
     'Write-Status' = ${function:Write-Status}
     'Write-Log' = ${function:Write-Log}
-    'Set-RegistryValue' = ${function:Set-RegistryValue}
-    'Restart-Explorer' = ${function:Restart-Explorer}
     'Set-StageFlag' = ${function:Set-StageFlag}
     'Test-StageFlag' = ${function:Test-StageFlag}
     'Invoke-ExternalCommand' = ${function:Invoke-ExternalCommand}
+    'Set-Env' = ${function:Set-Env}
+    'Reload-Path' = ${function:Reload-Path}
     'Test-Command' = ${function:Test-Command}
+    'Install-WithWinget' = ${function:Install-WithWinget}
 }
+
+return $exports
 
 # Example usage:
 # Set-Env -Name 'PATH' -Value 'C:\Users\admin\AppData\Local\Microsoft\WinGet\Packages\sxyazi.yazi_Microsoft.Winget.Source_8wekyb3d8bbwe\yazi-x86_64-pc-windows-msvc' -Scope 'User' -Verbose
