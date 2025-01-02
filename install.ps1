@@ -117,25 +117,46 @@ Write-Status "Style settings" -Status "Applied" -Color "Green"
 if (-not (Test-ScoopInstallation)) {
     Write-Status "Installing Scoop..." -Status "Starting" -Color "Yellow"
     
-    # Set execution policy and install Scoop
-    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-    if (-not (Invoke-ExternalCommand -Command 'Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression' `
-            -Description "Scoop Installation" -UseShell)) {
-        Write-Error "Failed to install Scoop"
-        exit 1
+    # Store current location and privileges
+    $currentLocation = Get-Location
+    $isAdmin = Test-AdminPrivileges
+    
+    try {
+        # If running as admin, we need to drop privileges for Scoop installation
+        if ($isAdmin) {
+            Write-Host "Dropping admin privileges for Scoop installation..." -ForegroundColor Yellow
+            $processInfo = New-Object System.Diagnostics.ProcessStartInfo
+            $processInfo.FileName = "powershell.exe"
+            $processInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command `"Set-ExecutionPolicy RemoteSigned -Scope CurrentUser; irm get.scoop.sh | iex`""
+            $processInfo.UseShellExecute = $true
+            $processInfo.Verb = "runas"
+            $process = [System.Diagnostics.Process]::Start($processInfo)
+            $process.WaitForExit()
+            
+            if ($process.ExitCode -ne 0) {
+                throw "Scoop installation failed with exit code: $($process.ExitCode)"
+            }
+        } else {
+            # Set execution policy and install Scoop
+            Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+            Invoke-RestMethod -Uri get.scoop.sh | Invoke-Expression
+        }
+        
+        # Reload PATH
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        
+        # Add main bucket
+        if (-not (Invoke-ExternalCommand -Command 'scoop bucket add main' `
+                -Description "Adding Scoop main bucket")) {
+            Write-Error "Failed to add Scoop main bucket"
+            exit 1
+        }
+        
+        Write-Status "Scoop installation" -Status "Completed" -Color "Green"
+    } finally {
+        # Restore location
+        Set-Location $currentLocation
     }
-    
-    # Add main bucket
-    if (-not (Invoke-ExternalCommand -Command 'scoop bucket add main' `
-            -Description "Adding Scoop main bucket")) {
-        Write-Error "Failed to add Scoop main bucket"
-        exit 1
-    }
-    
-    # Reload PATH after Scoop installation
-    Reload-Path
-    
-    Write-Status "Scoop installation" -Status "Completed" -Color "Green"
 } else {
     Write-Status "Scoop" -Status "Already installed" -Color "Green"
 }
