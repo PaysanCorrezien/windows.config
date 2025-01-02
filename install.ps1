@@ -781,17 +781,20 @@ if (-not (Test-StageFlag "personal-repos-setup")) {
     }
     
     # Setup Neovim config
+    $nvimConfigPath = "$env:LOCALAPPDATA\nvim"
     $nvimConfigParent = Split-Path $nvimConfigPath -Parent
     if (-not (Test-Path $nvimConfigParent)) {
         New-Item -ItemType Directory -Path $nvimConfigParent -Force | Out-Null
         Write-Status "Created Neovim config parent directory" -Status "Done" -Color "Green"
     }
     
-    $nvimConfigPath = "$env:LOCALAPPDATA\nvim"
     if (-not (Test-Path $nvimConfigPath)) {
         if (-not (Invoke-ExternalCommand -Command "git clone https://github.com/PaysanCorrezien/config.nvim.git $nvimConfigPath" `
                 -Description "Cloning Neovim config")) {
-            Handle-Error "Failed to clone Neovim config" "Neovim config cloning"
+            if (-not (Handle-Error "Failed to clone Neovim config" "Neovim config cloning")) {
+                Exit-Script
+                return
+            }
         }
         Write-Status "Neovim config" -Status "Cloned" -Color "Green"
     } else {
@@ -803,7 +806,10 @@ if (-not (Test-StageFlag "personal-repos-setup")) {
     if (-not (Test-Path $weztermConfigPath)) {
         if (-not (Invoke-ExternalCommand -Command "git clone https://github.com/PaysanCorrezien/config.wezterm $weztermConfigPath" `
                 -Description "Cloning WezTerm config")) {
-            Handle-Error "Failed to clone WezTerm config" "WezTerm config cloning"
+            if (-not (Handle-Error "Failed to clone WezTerm config" "WezTerm config cloning")) {
+                Exit-Script
+                return
+            }
         }
         Write-Status "WezTerm config" -Status "Cloned" -Color "Green"
     } else {
