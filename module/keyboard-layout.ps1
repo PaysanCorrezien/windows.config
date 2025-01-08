@@ -162,6 +162,23 @@ function Remove-AllOtherLayouts {
         Set-ItemProperty -Path $userLayoutPath -Name "1" -Value $customLayout -Type String
     }
 
+    # Set for Windows sign-in screen
+    $winLogonPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
+    if (-not (Test-Path $winLogonPath)) {
+        New-Item -Path $winLogonPath -Force | Out-Null
+    }
+    Set-ItemProperty -Path $winLogonPath -Name "KeyboardLayout" -Value $customLayout.Split(':')[1] -Type String
+
+    # Set keyboard layout for system accounts
+    $systemPreferencesPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\S-1-5-18\Control Panel\International"
+    if (-not (Test-Path $systemPreferencesPath)) {
+        New-Item -Path $systemPreferencesPath -Force | Out-Null
+    }
+    Set-ItemProperty -Path $systemPreferencesPath -Name "LayerDriver" -Value "kbd101.dll" -Type String
+    Set-ItemProperty -Path $systemPreferencesPath -Name "Layout" -Value $customLayout.Split(':')[1] -Type String
+    Set-ItemProperty -Path $systemPreferencesPath -Name "LayerDriverJPN" -Value "" -Type String
+    Set-ItemProperty -Path $systemPreferencesPath -Name "LayoutText" -Value $customLayout.Split(':')[1] -Type String
+
     # Remove from default user profile
     $defaultUserPath = "C:\Users\Default\NTUSER.DAT"
     if (Test-Path $defaultUserPath) {
@@ -173,6 +190,11 @@ function Remove-AllOtherLayouts {
         }
         New-Item -Path $defaultLayoutPath -Force | Out-Null
         reg add "HKU\Default\Keyboard Layout\Preload" /v "1" /t REG_SZ /d $customLayout /f
+        
+        # Also set in the default user's international settings
+        reg add "HKU\Default\Control Panel\International" /v "LayerDriver" /t REG_SZ /d "kbd101.dll" /f
+        reg add "HKU\Default\Control Panel\International" /v "Layout" /t REG_SZ /d $customLayout.Split(':')[1] /f
+        reg add "HKU\Default\Control Panel\International" /v "LayoutText" /t REG_SZ /d $customLayout.Split(':')[1] /f
         
         [gc]::Collect()
         reg unload "HKU\Default"
@@ -226,6 +248,13 @@ function Remove-AllOtherLayouts {
     if ($substitutes) {
         Remove-Item -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layout\Substitutes" -Force -ErrorAction SilentlyContinue
     }
+
+    # Set default sign-in screen layout
+    $signInPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Authentication\LogonUI\SessionData"
+    if (-not (Test-Path $signInPath)) {
+        New-Item -Path $signInPath -Force | Out-Null
+    }
+    Set-ItemProperty -Path $signInPath -Name "PreferredInputMethodOverride" -Value $customLayout -Type String
 }
 
 function Set-SingleCustomKeyboard {
