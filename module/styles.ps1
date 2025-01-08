@@ -89,26 +89,29 @@ function Set-AccentColor {
     try {
         Write-Log "Setting accent color to $ColorScheme..."
         
-        # Color values in ABGR format (Rose Pine colors)
+        # Color values in ARGB format (FF + RGB hex)
         $colorMap = @{
-            'Default' = 0xFF0078D7  # Windows blue
-            'Rose'    = 0xFF241719  # Rose Pine base #191724
-            'Sky'     = 0xFFE3A02B  # Light blue
-            'Purple'  = 0xFF8B3D8A  # Royal purple
-            'Orange'  = 0xFF3B83F7  # Vibrant orange
-            'Forest'  = 0xFF2D8A5F  # Forest green
-            'Ocean'   = 0xFFB15C31  # Deep blue
+            'Default' = 'FF0078D7'  # Windows blue
+            'Rose'    = 'FF191724'  # Rose Pine base #191724
+            'Sky'     = 'FF2B90E3'  # Light blue
+            'Purple'  = 'FF8A3D8B'  # Royal purple
+            'Orange'  = 'FFF7833B'  # Vibrant orange
+            'Forest'  = 'FF5F8A2D'  # Forest green
+            'Ocean'   = 'FF315CB1'  # Deep blue
         }
         
-        $colorValue = $colorMap[$ColorScheme]
+        $colorHex = $colorMap[$ColorScheme]
+        $colorDecimal = [convert]::ToInt32($colorHex, 16)
+        
+        Write-Log "Converting color $colorHex to decimal: $colorDecimal"
         
         # Enable Windows color scheme
         Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "ColorPrevalence" -Value 1
         Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "ColorPrevalence" -Value 1
         
         # Set accent color
-        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "AccentColor" -Value $colorValue -Type "DWORD"
-        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent" -Name "AccentColor" -Value $colorValue -Type "DWORD"
+        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "AccentColor" -Value $colorDecimal -Type "DWORD"
+        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent" -Name "AccentColor" -Value $colorDecimal -Type "DWORD"
         
         Write-Log "Accent color set successfully"
     }
@@ -166,7 +169,22 @@ function Install-Cursor {
             throw "Cursor directory not found at: $cursorPath"
         }
 
-        $infPath = Join-Path $cursorPath "install.inf"
+        # Create Windows Cursors directory if it doesn't exist
+        $windowsCursorDir = "$env:SystemRoot\Cursors"
+        $schemeName = "BreezeX-RosePine Cursors"
+        $schemeDir = Join-Path $windowsCursorDir $schemeName
+        
+        if (-not (Test-Path $schemeDir)) {
+            New-Item -ItemType Directory -Path $schemeDir -Force | Out-Null
+        }
+
+        # Copy all cursor files to Windows directory first
+        Write-Log "Copying cursor files to $schemeDir"
+        Get-ChildItem -Path $cursorPath -File -Include "*.cur","*.ani","*.inf" | ForEach-Object {
+            Copy-Item $_.FullName -Destination $schemeDir -Force
+        }
+
+        $infPath = Join-Path $schemeDir "install.inf"
         if (-not (Test-Path $infPath)) {
             throw "Cursor install.inf not found at: $infPath"
         }
@@ -178,6 +196,10 @@ function Install-Cursor {
         if ($result.ExitCode -ne 0) {
             throw "Failed to install cursor scheme. Exit code: $($result.ExitCode)"
         }
+
+        # Set the cursor scheme in registry
+        $cursorsKey = "HKCU:\Control Panel\Cursors"
+        Set-ItemProperty -Path $cursorsKey -Name "(default)" -Value $schemeName
 
         # Force cursor update
         $signature = @'
