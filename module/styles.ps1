@@ -157,6 +157,87 @@ function Set-Fonts {
     }
 }
 
+function Install-Cursor {
+    try {
+        Write-Log "Installing BreezeX-RosePine cursor..."
+        
+        $cursorPath = Join-Path $PSScriptRoot "..\BreezeX-RosePine-Windows"
+        if (-not (Test-Path $cursorPath)) {
+            throw "Cursor directory not found at: $cursorPath"
+        }
+
+        # Create the destination directory in Windows
+        $destDir = "$env:SystemRoot\Cursors\BreezeX-RoséPine Cursors"
+        if (-not (Test-Path $destDir)) {
+            New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+        }
+
+        # Copy all cursor files
+        Get-ChildItem -Path $cursorPath -File -Include "*.cur","*.ani" | ForEach-Object {
+            Copy-Item $_.FullName -Destination $destDir -Force
+        }
+
+        # Set cursor scheme in registry
+        $schemeKey = "HKCU:\Control Panel\Cursors\Schemes"
+        $cursorsKey = "HKCU:\Control Panel\Cursors"
+        
+        if (-not (Test-Path $schemeKey)) {
+            New-Item -Path $schemeKey -Force | Out-Null
+        }
+
+        # Set cursor scheme
+        $cursorMapping = @{
+            "AppStarting" = "Work.ani"
+            "Arrow"       = "Default.cur"
+            "Crosshair"   = "Cross.cur"
+            "Hand"        = "Link.cur"
+            "Help"        = "Help.cur"
+            "IBeam"       = "IBeam.cur"
+            "No"          = "Unavailiable.cur"
+            "NWPen"       = "Handwriting.cur"
+            "SizeAll"     = "Move.cur"
+            "SizeNESW"    = "Diagonal_2.cur"
+            "SizeNS"      = "Vertical.cur"
+            "SizeNWSE"    = "Diagonal_1.cur"
+            "SizeWE"      = "Horizontal.cur"
+            "UpArrow"     = "Alternate.cur"
+            "Wait"        = "Busy.ani"
+        }
+
+        # Build the scheme string
+        $schemeString = ($cursorMapping.Values | ForEach-Object { "%10%\%CUR_DIR%\$_" }) -join ","
+        Set-ItemProperty -Path $schemeKey -Name "BreezeX-RoséPine Cursors" -Value $schemeString
+
+        # Set each cursor individually
+        foreach ($cursor in $cursorMapping.GetEnumerator()) {
+            $value = Join-Path $destDir $cursor.Value
+            Set-ItemProperty -Path $cursorsKey -Name $cursor.Key -Value $value
+        }
+
+        # Set scheme as default
+        Set-ItemProperty -Path $cursorsKey -Name "(default)" -Value "BreezeX-RoséPine Cursors"
+        
+        # Force cursor update with both methods
+        $signature = @'
+[DllImport("user32.dll", SetLastError = true)]
+public static extern bool SystemParametersInfo(uint uiAction, uint uiParam, String pvParam, uint fWinIni);
+'@
+        $systemParamInfo = Add-Type -MemberDefinition $signature -Name WinAPICall -Namespace SystemParamInfo -PassThru
+        $systemParamInfo::SystemParametersInfo(0x0057, 0, $null, 0x03) | Out-Null  # Changed to 0x03 for SPIF_UPDATEINIFILE | SPIF_SENDCHANGE
+
+        # Additional registry settings to ensure cursor update
+        Set-ItemProperty -Path $cursorsKey -Name "Scheme Source" -Value 1
+        Set-ItemProperty -Path $cursorsKey -Name "CursorDelay" -Value 1
+
+        Write-Log "Cursor installation completed successfully"
+        Write-Host "Please log out and log back in for the cursor changes to take full effect."
+    }
+    catch {
+        Write-Log "Error installing cursor: $_"
+        throw
+    }
+}
+
 function Set-WindowsStyle {
     [CmdletBinding()]
     param (
@@ -164,7 +245,8 @@ function Set-WindowsStyle {
         [switch]$HideDesktopIcons,
         [ValidateSet('Default', 'Rose', 'Sky', 'Purple', 'Orange', 'Forest', 'Ocean')]
         [string]$AccentColor = 'Default',
-        [switch]$EnableDarkMode = $true
+        [switch]$EnableDarkMode = $true,
+        [switch]$InstallCursor = $true
     )
     
     try {
@@ -184,6 +266,10 @@ function Set-WindowsStyle {
         
         Set-AccentColor -ColorScheme $AccentColor
         Set-Fonts
+
+        if ($InstallCursor) {
+            Install-Cursor
+        }
         
         Restart-Explorer
         Write-Log "Style configuration completed successfully"
@@ -202,4 +288,5 @@ function Set-WindowsStyle {
     'Set-DarkMode' = ${function:Set-DarkMode}
     'Set-AccentColor' = ${function:Set-AccentColor}
     'Set-Fonts' = ${function:Set-Fonts}
+    'Install-Cursor' = ${function:Install-Cursor}
 }
