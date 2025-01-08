@@ -91,17 +91,59 @@ function Get-CustomLayoutCode {
 }
 
 function Ensure-EnglishLanguage {
-    Write-Host "Ensuring US English language is available..." -ForegroundColor Yellow
-    $languageList = Get-WinUserLanguageList
+    Write-Host "Setting US English as system language..." -ForegroundColor Yellow
     
-    # Check if English US is already in the list
-    $enUS = $languageList | Where-Object { $_.LanguageTag -eq 'en-US' }
-    if (-not $enUS) {
-        Write-Host "Adding US English to language list..." -ForegroundColor Yellow
-        $enUS = New-WinUserLanguageList en-US
-        $languageList.Add($enUS[0])
-        Set-WinUserLanguageList $languageList -Force
+    # Set system locale to English
+    Set-WinSystemLocale -SystemLocale en-US
+    
+    # Set user locale to English
+    Set-WinUserLanguageList en-US -Force
+    
+    # Set display language
+    Set-WinUILanguageOverride -Language en-US
+    
+    # Set default input language to English
+    Set-WinDefaultInputMethodOverride -InputTip "0409:00000409"
+    
+    # Force Windows display language
+    $languagePath = "HKLM:\SYSTEM\CurrentControlSet\Control\MUI\Settings"
+    if (-not (Test-Path $languagePath)) {
+        New-Item -Path $languagePath -Force | Out-Null
     }
+    Set-ItemProperty -Path $languagePath -Name "PreferredUILanguages" -Value "en-US" -Type MultiString
+    
+    # Set system UI language
+    $languageList = Get-WinUserLanguageList
+    $languageList.Clear()
+    $enUS = New-WinUserLanguageList en-US
+    $languageList.Add($enUS[0])
+    Set-WinUserLanguageList $languageList -Force
+    
+    # Set regional settings to English
+    Set-Culture en-US
+    
+    # Set additional registry keys for language settings
+    $regPaths = @(
+        "HKCU:\Control Panel\International",
+        "HKCU:\Control Panel\Desktop",
+        "HKLM:\SYSTEM\CurrentControlSet\Control\MUI\UILanguages\en-US"
+    )
+    
+    foreach ($path in $regPaths) {
+        if (-not (Test-Path $path)) {
+            New-Item -Path $path -Force | Out-Null
+        }
+    }
+    
+    # Set locale settings
+    Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name "LocaleName" -Value "en-US"
+    Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name "sLanguage" -Value "ENU"
+    Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name "sSystemLocale" -Value "en-US"
+    
+    # Lock language settings
+    Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "PreferredUILanguages" -Value "en-US" -Type MultiString
+    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\MUI\UILanguages\en-US" -Name "Default" -Value 1 -Type DWord
+    
     return $true
 }
 
@@ -110,15 +152,13 @@ function Remove-AllOtherLayouts {
     $customLayout = Get-CustomLayoutCode
     if (-not $customLayout) { return }
 
-    # Ensure we have US English
+    # Force English and remove other languages first
     Ensure-EnglishLanguage
     
     # Remove from current user
     $userLayoutPath = "HKCU:\Keyboard Layout\Preload"
     if (Test-Path $userLayoutPath) {
-        # Remove all existing entries
         Remove-Item -Path $userLayoutPath -Force -ErrorAction SilentlyContinue
-        # Create new with only our layout
         New-Item -Path $userLayoutPath -Force | Out-Null
         Set-ItemProperty -Path $userLayoutPath -Name "1" -Value $customLayout -Type String
     }
@@ -129,11 +169,9 @@ function Remove-AllOtherLayouts {
         reg load "HKU\Default" $defaultUserPath
         $defaultLayoutPath = "Registry::HKU\Default\Keyboard Layout\Preload"
         
-        # Remove all existing entries
         if (Test-Path $defaultLayoutPath) {
             Remove-Item -Path $defaultLayoutPath -Force -ErrorAction SilentlyContinue
         }
-        # Create new with only our layout
         New-Item -Path $defaultLayoutPath -Force | Out-Null
         reg add "HKU\Default\Keyboard Layout\Preload" /v "1" /t REG_SZ /d $customLayout /f
         
@@ -141,7 +179,36 @@ function Remove-AllOtherLayouts {
         reg unload "HKU\Default"
     }
 
-    # Also remove from language list
+    # Set keyboard layout in multiple registry locations
+    $regPaths = @(
+        "HKCU:\Keyboard Layout\Preload",
+        "HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layout",
+        "HKCU:\Control Panel\International\User Profile",
+        "HKLM:\SYSTEM\CurrentControlSet\Control\MUI\Settings",
+        "HKCU:\Control Panel\International",
+        "HKLM:\SOFTWARE\Microsoft\CTF\Assemblies\0x00000409\{34745C63-B2F0-4784-8B67-5E12C8701A31}"
+    )
+
+    foreach ($path in $regPaths) {
+        if (-not (Test-Path $path)) {
+            New-Item -Path $path -Force | Out-Null
+        }
+    }
+
+    # Set default layout in various locations
+    Set-ItemProperty -Path "HKCU:\Keyboard Layout\Preload" -Name "1" -Value $customLayout -Type String
+    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layout" -Name "DefaultLayout" -Value $customLayout -Type String
+    Set-ItemProperty -Path "HKCU:\Control Panel\International\User Profile" -Name "InputMethodOverride" -Value $customLayout -Type String
+    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\MUI\Settings" -Name "PreferredInputMethod" -Value $customLayout -Type String
+    
+    # Force keyboard layout
+    Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name "DefaultInputMethodOverride" -Value $customLayout -Type String
+    
+    # Set layout as default for text services
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\CTF\Assemblies\0x00000409\{34745C63-B2F0-4784-8B67-5E12C8701A31}" -Name "Default" -Value $customLayout -Type String
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\CTF\Assemblies\0x00000409\{34745C63-B2F0-4784-8B67-5E12C8701A31}" -Name "Profile" -Value $customLayout -Type String
+    
+    # Update language list
     $languageList = Get-WinUserLanguageList
     $enUS = $languageList | Where-Object { $_.LanguageTag -eq 'en-US' }
     if (-not $enUS) {
@@ -151,30 +218,9 @@ function Remove-AllOtherLayouts {
     $enUS.InputMethodTips.Clear()
     $enUS.InputMethodTips.Add($customLayout)
     
-    # Remove other languages and set en-US as default
+    # Set as only language
     $languageList = @($enUS)
     Set-WinUserLanguageList $languageList -Force
-
-    # Set as system default
-    $systemLayoutPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layout"
-    if (-not (Test-Path $systemLayoutPath)) {
-        New-Item -Path $systemLayoutPath -Force | Out-Null
-    }
-    Set-ItemProperty -Path $systemLayoutPath -Name "DefaultLayout" -Value $customLayout -Type String
-
-    # Set as default input method
-    $inputMethodPath = "HKCU:\Control Panel\International\User Profile"
-    if (-not (Test-Path $inputMethodPath)) {
-        New-Item -Path $inputMethodPath -Force | Out-Null
-    }
-    Set-ItemProperty -Path $inputMethodPath -Name "InputMethodOverride" -Value $customLayout -Type String
-
-    # Set default input method for new users
-    $defaultInputMethodPath = "HKLM:\SYSTEM\CurrentControlSet\Control\MUI\Settings"
-    if (-not (Test-Path $defaultInputMethodPath)) {
-        New-Item -Path $defaultInputMethodPath -Force | Out-Null
-    }
-    Set-ItemProperty -Path $defaultInputMethodPath -Name "PreferredInputMethod" -Value $customLayout -Type String
 }
 
 function Set-SingleCustomKeyboard {
@@ -204,6 +250,7 @@ function Set-SingleCustomKeyboard {
     $currentLayouts = (Get-WinUserLanguageList)[0].InputMethodTips
     if ($currentLayouts.Count -eq 1 -and $currentLayouts[0] -eq $layoutCode) {
         Write-Host "✓ Alt Gr dead keys layout set as the only keyboard layout" -ForegroundColor Green
+        Write-Host "✓ System language set to English (US)" -ForegroundColor Green
     } else {
         Write-Host "✗ Failed to set layout exclusively" -ForegroundColor Red
         Write-Host "Current layouts: $($currentLayouts -join ', ')" -ForegroundColor Yellow
