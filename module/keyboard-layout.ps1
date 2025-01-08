@@ -17,9 +17,25 @@ function Get-InstalledKeyboardLayouts {
 }
 
 function Test-KeyboardLayout {
+    # Check for our flag file first
+    $flagsDir = Join-Path $PSScriptRoot "..\flags"
+    $flagPath = Join-Path $flagsDir "keyboard-layout-configured.txt"
+    
+    if (-not (Test-Path $flagPath)) {
+        return $false
+    }
+    
+    # Even if flag exists, verify the layout is actually set correctly
     $customLayout = Get-CustomLayoutCode
     $currentLayouts = Get-InstalledKeyboardLayouts
-    return $currentLayouts -contains $customLayout
+    
+    # If layout is not set correctly, return false to force reconfiguration
+    if (-not ($currentLayouts -contains $customLayout)) {
+        Remove-Item -Path $flagPath -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+    
+    return $true
 }
 
 function Install-CustomLayout {
@@ -85,19 +101,23 @@ function Get-CustomLayoutCode {
 }
 
 function Ensure-EnglishLanguage {
-    Write-Host "Setting US English as system language..." -ForegroundColor Yellow
+    Write-Host "Setting US English International as system language..." -ForegroundColor Yellow
     
     # Set system locale to English
     Set-WinSystemLocale -SystemLocale en-US
     
     # Set user locale to English
-    Set-WinUserLanguageList en-US -Force
+    $languageList = New-WinUserLanguageList en-US
+    $languageList[0].InputMethodTips.Clear()
+    # Specifically set English International
+    $languageList[0].InputMethodTips.Add("0409:00020409")
+    Set-WinUserLanguageList $languageList -Force
     
     # Set display language
     Set-WinUILanguageOverride -Language en-US
     
-    # Set default input language to English
-    Set-WinDefaultInputMethodOverride -InputTip "0409:00000409"
+    # Set default input language to English International
+    Set-WinDefaultInputMethodOverride -InputTip "0409:00020409"
     
     # Force Windows display language
     $languagePath = "HKLM:\SYSTEM\CurrentControlSet\Control\MUI\Settings"
@@ -105,13 +125,6 @@ function Ensure-EnglishLanguage {
         New-Item -Path $languagePath -Force | Out-Null
     }
     Set-ItemProperty -Path $languagePath -Name "PreferredUILanguages" -Value "en-US" -Type MultiString
-    
-    # Set system UI language
-    $languageList = Get-WinUserLanguageList
-    $languageList.Clear()
-    $enUS = New-WinUserLanguageList en-US
-    $languageList.Add($enUS[0])
-    Set-WinUserLanguageList $languageList -Force
     
     # Set regional settings to English
     Set-Culture en-US
@@ -133,6 +146,7 @@ function Ensure-EnglishLanguage {
     Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name "LocaleName" -Value "en-US"
     Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name "sLanguage" -Value "ENU"
     Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name "sSystemLocale" -Value "en-US"
+    Set-ItemProperty -Path "HKCU:\Control Panel\International" -Name "sDefaultLanguage" -Value "ENU"
     
     # Lock language settings
     Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "PreferredUILanguages" -Value "en-US" -Type MultiString
@@ -280,14 +294,24 @@ function Set-SingleCustomKeyboard {
         Write-Host "Note: Could not immediately switch input language. It will be applied after restart." -ForegroundColor Yellow
     }
 
+    # Create flag file to indicate successful configuration
+    $flagsDir = Join-Path $PSScriptRoot "..\flags"
+    if (-not (Test-Path $flagsDir)) {
+        New-Item -ItemType Directory -Path $flagsDir -Force | Out-Null
+    }
+    $flagPath = Join-Path $flagsDir "keyboard-layout-configured.txt"
+    Get-Date | Set-Content $flagPath
+
     # Verify the layout was set correctly
     $currentLayouts = (Get-WinUserLanguageList)[0].InputMethodTips
     if ($currentLayouts.Count -eq 1 -and $currentLayouts[0] -eq $layoutCode) {
         Write-Host "✓ Alt Gr dead keys layout set as the only keyboard layout" -ForegroundColor Green
-        Write-Host "✓ System language set to English (US)" -ForegroundColor Green
+        Write-Host "✓ System language set to English (US) International" -ForegroundColor Green
     } else {
         Write-Host "✗ Failed to set layout exclusively" -ForegroundColor Red
         Write-Host "Current layouts: $($currentLayouts -join ', ')" -ForegroundColor Yellow
+        # Remove flag file if verification failed
+        Remove-Item -Path $flagPath -Force -ErrorAction SilentlyContinue
     }
 }
 
