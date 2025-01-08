@@ -164,9 +164,12 @@ function Install-Cursor {
     try {
         Write-Log "Installing BreezeX-RosePine cursor..."
         
-        $cursorPath = Join-Path $PSScriptRoot "..\BreezeX-RosePine-Windows"
-        if (-not (Test-Path $cursorPath)) {
-            throw "Cursor directory not found at: $cursorPath"
+        # Get absolute path to cursor files
+        $cursorSourcePath = Resolve-Path (Join-Path $PSScriptRoot "..\BreezeX-RosePine-Windows")
+        Write-Log "Source cursor path: $cursorSourcePath"
+        
+        if (-not (Test-Path $cursorSourcePath)) {
+            throw "Cursor source directory not found at: $cursorSourcePath"
         }
 
         # Create Windows Cursors directory with simple name
@@ -174,15 +177,19 @@ function Install-Cursor {
         $schemeName = "RosePineCursors"
         $schemeDir = Join-Path $windowsCursorDir $schemeName
         
-        if (-not (Test-Path $schemeDir)) {
-            New-Item -ItemType Directory -Path $schemeDir -Force | Out-Null
+        # Recreate the directory to ensure it's clean
+        if (Test-Path $schemeDir) {
+            Remove-Item -Path $schemeDir -Recurse -Force
         }
+        New-Item -ItemType Directory -Path $schemeDir -Force | Out-Null
 
-        # Copy all cursor files to Windows directory first
-        Write-Log "Copying cursor files to $schemeDir"
-        Get-ChildItem -Path $cursorPath -File -Include "*.cur","*.ani","*.inf" | ForEach-Object {
-            Copy-Item $_.FullName -Destination $schemeDir -Force
-        }
+        # Copy all cursor files from source to Windows directory
+        Write-Log "Copying cursor files from $cursorSourcePath to $schemeDir"
+        Copy-Item -Path "$cursorSourcePath\*" -Destination $schemeDir -Include "*.cur","*.ani","*.inf" -Force
+        
+        # Verify files were copied
+        $copiedFiles = Get-ChildItem -Path $schemeDir
+        Write-Log "Copied files: $($copiedFiles.Name -join ', ')"
 
         $infPath = Join-Path $schemeDir "install.inf"
         if (-not (Test-Path $infPath)) {
