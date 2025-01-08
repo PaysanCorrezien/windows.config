@@ -89,10 +89,10 @@ function Set-AccentColor {
     try {
         Write-Log "Setting accent color to $ColorScheme..."
         
-        # Color values in ABGR format
+        # Color values in ABGR format (Rose Pine colors)
         $colorMap = @{
             'Default' = 0xFF0078D7  # Windows blue
-            'Rose'    = 0xFF2D7D9A  # Soft pink
+            'Rose'    = 0xFF241719  # Rose Pine base #191724
             'Sky'     = 0xFFE3A02B  # Light blue
             'Purple'  = 0xFF8B3D8A  # Royal purple
             'Orange'  = 0xFF3B83F7  # Vibrant orange
@@ -166,71 +166,29 @@ function Install-Cursor {
             throw "Cursor directory not found at: $cursorPath"
         }
 
-        # Create the destination directory in Windows
-        $destDir = "$env:SystemRoot\Cursors\BreezeX-RoséPine Cursors"
-        if (-not (Test-Path $destDir)) {
-            New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+        $infPath = Join-Path $cursorPath "install.inf"
+        if (-not (Test-Path $infPath)) {
+            throw "Cursor install.inf not found at: $infPath"
         }
 
-        # Copy all cursor files
-        Get-ChildItem -Path $cursorPath -File -Include "*.cur","*.ani" | ForEach-Object {
-            Copy-Item $_.FullName -Destination $destDir -Force
-        }
-
-        # Set cursor scheme in registry
-        $schemeKey = "HKCU:\Control Panel\Cursors\Schemes"
-        $cursorsKey = "HKCU:\Control Panel\Cursors"
+        # Install cursor using the .inf file
+        Write-Log "Installing cursor using $infPath"
+        $result = Start-Process "rundll32.exe" -ArgumentList "setupapi,InstallHinfSection DefaultInstall 132 $infPath" -Wait -NoNewWindow -PassThru
         
-        if (-not (Test-Path $schemeKey)) {
-            New-Item -Path $schemeKey -Force | Out-Null
+        if ($result.ExitCode -ne 0) {
+            throw "Failed to install cursor scheme. Exit code: $($result.ExitCode)"
         }
 
-        # Set cursor scheme
-        $cursorMapping = @{
-            "AppStarting" = "Work.ani"
-            "Arrow"       = "Default.cur"
-            "Crosshair"   = "Cross.cur"
-            "Hand"        = "Link.cur"
-            "Help"        = "Help.cur"
-            "IBeam"       = "IBeam.cur"
-            "No"          = "Unavailiable.cur"
-            "NWPen"       = "Handwriting.cur"
-            "SizeAll"     = "Move.cur"
-            "SizeNESW"    = "Diagonal_2.cur"
-            "SizeNS"      = "Vertical.cur"
-            "SizeNWSE"    = "Diagonal_1.cur"
-            "SizeWE"      = "Horizontal.cur"
-            "UpArrow"     = "Alternate.cur"
-            "Wait"        = "Busy.ani"
-        }
-
-        # Build the scheme string
-        $schemeString = ($cursorMapping.Values | ForEach-Object { "%10%\%CUR_DIR%\$_" }) -join ","
-        Set-ItemProperty -Path $schemeKey -Name "BreezeX-RoséPine Cursors" -Value $schemeString
-
-        # Set each cursor individually
-        foreach ($cursor in $cursorMapping.GetEnumerator()) {
-            $value = Join-Path $destDir $cursor.Value
-            Set-ItemProperty -Path $cursorsKey -Name $cursor.Key -Value $value
-        }
-
-        # Set scheme as default
-        Set-ItemProperty -Path $cursorsKey -Name "(default)" -Value "BreezeX-RoséPine Cursors"
-        
-        # Force cursor update with both methods
+        # Force cursor update
         $signature = @'
 [DllImport("user32.dll", SetLastError = true)]
 public static extern bool SystemParametersInfo(uint uiAction, uint uiParam, String pvParam, uint fWinIni);
 '@
         $systemParamInfo = Add-Type -MemberDefinition $signature -Name WinAPICall -Namespace SystemParamInfo -PassThru
-        $systemParamInfo::SystemParametersInfo(0x0057, 0, $null, 0x03) | Out-Null  # Changed to 0x03 for SPIF_UPDATEINIFILE | SPIF_SENDCHANGE
-
-        # Additional registry settings to ensure cursor update
-        Set-ItemProperty -Path $cursorsKey -Name "Scheme Source" -Value 1
-        Set-ItemProperty -Path $cursorsKey -Name "CursorDelay" -Value 1
+        $systemParamInfo::SystemParametersInfo(0x0057, 0, $null, 0x03) | Out-Null
 
         Write-Log "Cursor installation completed successfully"
-        Write-Host "Please log out and log back in for the cursor changes to take full effect."
+        Write-Host "Cursor scheme has been installed. Changes should take effect immediately."
     }
     catch {
         Write-Log "Error installing cursor: $_"
