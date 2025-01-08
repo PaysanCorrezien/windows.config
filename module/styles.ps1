@@ -169,9 +169,9 @@ function Install-Cursor {
             throw "Cursor directory not found at: $cursorPath"
         }
 
-        # Create Windows Cursors directory if it doesn't exist
+        # Create Windows Cursors directory with simple name
         $windowsCursorDir = "$env:SystemRoot\Cursors"
-        $schemeName = "BreezeX-RosePine Cursors"
+        $schemeName = "RosePineCursors"
         $schemeDir = Join-Path $windowsCursorDir $schemeName
         
         if (-not (Test-Path $schemeDir)) {
