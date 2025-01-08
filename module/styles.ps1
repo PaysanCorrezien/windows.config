@@ -163,49 +163,6 @@ function Set-Fonts {
     }
 }
 
-function Install-Cursor {
-    try {
-        Write-Log "Installing BreezeX-RosePine cursor..."
-        
-        # Get absolute path to cursor files
-        $cursorSourcePath = Resolve-Path (Join-Path $PSScriptRoot "..\BreezeX-RosePine-Windows")
-        Write-Log "Source cursor path: $cursorSourcePath"
-        
-        if (-not (Test-Path $cursorSourcePath)) {
-            throw "Cursor source directory not found at: $cursorSourcePath"
-        }
-
-        # Create Windows Cursors directory
-        $windowsCursorDir = "$env:SystemRoot\Cursors"
-        $schemeDir = Join-Path $windowsCursorDir "BreezeX-RosePine"
-        
-        # Recreate the directory to ensure it's clean
-        if (Test-Path $schemeDir) {
-            Remove-Item -Path $schemeDir -Recurse -Force
-        }
-        New-Item -ItemType Directory -Path $schemeDir -Force | Out-Null
-
-        # Copy all cursor files
-        Write-Log "Copying cursor files from $cursorSourcePath to $schemeDir"
-        Copy-Item -Path "$cursorSourcePath\*" -Destination $schemeDir -Include "*.cur","*.ani","*.inf" -Force
-
-        # Install cursor using the .inf file
-        $infPath = Join-Path $schemeDir "install.inf"
-        Write-Log "Installing cursor using $infPath"
-        $result = Start-Process "rundll32.exe" -ArgumentList "setupapi,InstallHinfSection DefaultInstall 132 $infPath" -Wait -NoNewWindow -PassThru
-        
-        if ($result.ExitCode -ne 0) {
-            throw "Failed to install cursor scheme. Exit code: $($result.ExitCode)"
-        }
-
-        Write-Log "Cursor installation completed successfully"
-        Write-Host "Cursor scheme has been installed. Changes should take effect immediately."
-    }
-    catch {
-        Write-Log "Error installing cursor: $_"
-        throw
-    }
-}
 
 function Set-WindowsStyle {
     [CmdletBinding()]
@@ -214,8 +171,7 @@ function Set-WindowsStyle {
         [switch]$HideDesktopIcons,
         [ValidateSet('Default', 'Rose', 'Sky', 'Purple', 'Orange', 'Forest', 'Ocean')]
         [string]$AccentColor = 'Default',
-        [switch]$EnableDarkMode = $true,
-        [switch]$InstallCursor = $true
+        [switch]$EnableDarkMode = $true
     )
     
     try {
@@ -235,10 +191,6 @@ function Set-WindowsStyle {
         
         Set-AccentColor -ColorScheme $AccentColor
         Set-Fonts
-
-        if ($InstallCursor) {
-            Install-Cursor
-        }
         
         Restart-Explorer
         Write-Log "Style configuration completed successfully"
@@ -257,5 +209,4 @@ function Set-WindowsStyle {
     'Set-DarkMode' = ${function:Set-DarkMode}
     'Set-AccentColor' = ${function:Set-AccentColor}
     'Set-Fonts' = ${function:Set-Fonts}
-    'Install-Cursor' = ${function:Install-Cursor}
 }
