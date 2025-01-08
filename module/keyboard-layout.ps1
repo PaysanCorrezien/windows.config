@@ -151,9 +151,30 @@ function Remove-AllOtherLayouts {
     $enUS.InputMethodTips.Clear()
     $enUS.InputMethodTips.Add($customLayout)
     
-    # Remove other languages
+    # Remove other languages and set en-US as default
     $languageList = @($enUS)
     Set-WinUserLanguageList $languageList -Force
+
+    # Set as system default
+    $systemLayoutPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layout"
+    if (-not (Test-Path $systemLayoutPath)) {
+        New-Item -Path $systemLayoutPath -Force | Out-Null
+    }
+    Set-ItemProperty -Path $systemLayoutPath -Name "DefaultLayout" -Value $customLayout -Type String
+
+    # Set as default input method
+    $inputMethodPath = "HKCU:\Control Panel\International\User Profile"
+    if (-not (Test-Path $inputMethodPath)) {
+        New-Item -Path $inputMethodPath -Force | Out-Null
+    }
+    Set-ItemProperty -Path $inputMethodPath -Name "InputMethodOverride" -Value $customLayout -Type String
+
+    # Set default input method for new users
+    $defaultInputMethodPath = "HKLM:\SYSTEM\CurrentControlSet\Control\MUI\Settings"
+    if (-not (Test-Path $defaultInputMethodPath)) {
+        New-Item -Path $defaultInputMethodPath -Force | Out-Null
+    }
+    Set-ItemProperty -Path $defaultInputMethodPath -Name "PreferredInputMethod" -Value $customLayout -Type String
 }
 
 function Set-SingleCustomKeyboard {
@@ -169,6 +190,15 @@ function Set-SingleCustomKeyboard {
 
     # Remove all other layouts and set our custom one
     Remove-AllOtherLayouts
+
+    # Force update the input language
+    try {
+        $inputLanguage = [System.Globalization.CultureInfo]::GetCultureInfo('en-US')
+        [System.Windows.Forms.InputLanguage]::CurrentInputLanguage = [System.Windows.Forms.InputLanguage]::FromCulture($inputLanguage)
+    }
+    catch {
+        Write-Host "Note: Could not immediately switch input language. It will be applied after restart." -ForegroundColor Yellow
+    }
 
     # Verify the layout was set correctly
     $currentLayouts = (Get-WinUserLanguageList)[0].InputMethodTips
@@ -234,8 +264,8 @@ function Set-CustomKeyboardLayout {
             if ($success) {
                 Write-Host "✓ Layout registered successfully" -ForegroundColor Green
                 Set-SingleCustomKeyboard
-                Write-Host "`n⚠ Please log off and log back on for changes to take effect" -ForegroundColor Yellow
-                Write-Host "✓ The Alt Gr dead keys layout will be the only layout available" -ForegroundColor Green
+                Write-Host "`n⚠ A system restart is required for changes to take full effect" -ForegroundColor Yellow
+                Write-Host "✓ The Alt Gr dead keys layout will be the only layout available after restart" -ForegroundColor Green
                 return $true
             } else {
                 Write-Host "✗ Layout registration timed out" -ForegroundColor Red

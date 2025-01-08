@@ -58,11 +58,113 @@ function Hide-DesktopIcons {
     }
 }
 
+function Set-DarkMode {
+    try {
+        Write-Log "Enabling dark mode..."
+        
+        # Enable dark mode for system
+        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "SystemUsesLightTheme" -Value 0
+        
+        # Enable dark mode for apps
+        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "AppsUseLightTheme" -Value 0
+        
+        # Enable dark mode for Explorer
+        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Themes" -Name "AppsUseLightTheme" -Value 0
+        
+        Write-Log "Dark mode enabled successfully"
+    }
+    catch {
+        Write-Log "Error enabling dark mode: $_"
+        throw
+    }
+}
+
+function Set-AccentColor {
+    param (
+        [Parameter(Mandatory=$true)]
+        [ValidateSet('Default', 'Rose', 'Sky', 'Purple', 'Orange', 'Forest', 'Ocean')]
+        [string]$ColorScheme = 'Default'
+    )
+    
+    try {
+        Write-Log "Setting accent color to $ColorScheme..."
+        
+        # Color values in ABGR format
+        $colorMap = @{
+            'Default' = 0xFF0078D7  # Windows blue
+            'Rose'    = 0xFF2D7D9A  # Soft pink
+            'Sky'     = 0xFFE3A02B  # Light blue
+            'Purple'  = 0xFF8B3D8A  # Royal purple
+            'Orange'  = 0xFF3B83F7  # Vibrant orange
+            'Forest'  = 0xFF2D8A5F  # Forest green
+            'Ocean'   = 0xFFB15C31  # Deep blue
+        }
+        
+        $colorValue = $colorMap[$ColorScheme]
+        
+        # Enable Windows color scheme
+        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "ColorPrevalence" -Value 1
+        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "ColorPrevalence" -Value 1
+        
+        # Set accent color
+        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "AccentColor" -Value $colorValue -Type "DWORD"
+        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent" -Name "AccentColor" -Value $colorValue -Type "DWORD"
+        
+        Write-Log "Accent color set successfully"
+    }
+    catch {
+        Write-Log "Error setting accent color: $_"
+        throw
+    }
+}
+
+function Set-Fonts {
+    try {
+        Write-Log "Starting font installation..."
+        
+        # Install required fonts using Chocolatey
+        $fonts = @(
+            "nerd-fonts-firacode",    # Primary coding font
+            "nerd-fonts-jetbrainsmono", # Alternative coding font
+            "nerd-fonts-hack",        # System font
+            "nerd-fonts-cascadiacode" # Terminal font
+        )
+        
+        foreach ($font in $fonts) {
+            Write-Log "Installing $font..."
+            choco install $font -y
+            if ($LASTEXITCODE -ne 0) {
+                Write-Log "Warning: Failed to install $font"
+            }
+        }
+        
+        # Refresh font cache
+        Write-Log "Refreshing font cache..."
+        $FONTS = 0x14
+        $objShell = New-Object -ComObject Shell.Application
+        $objFolder = $objShell.Namespace($FONTS)
+        
+        # Release COM objects
+        $null = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($objShell)
+        $null = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($objFolder)
+        
+        Write-Log "Font installation and cache refresh completed successfully"
+        Write-Host "Font installation complete. Please restart applications for the changes to take effect."
+    }
+    catch {
+        Write-Log "Error installing fonts: $_"
+        throw
+    }
+}
+
 function Set-WindowsStyle {
     [CmdletBinding()]
     param (
         [switch]$HideTaskbar,
-        [switch]$HideDesktopIcons
+        [switch]$HideDesktopIcons,
+        [ValidateSet('Default', 'Rose', 'Sky', 'Purple', 'Orange', 'Forest', 'Ocean')]
+        [string]$AccentColor = 'Default',
+        [switch]$EnableDarkMode = $true
     )
     
     try {
@@ -76,6 +178,13 @@ function Set-WindowsStyle {
             Hide-DesktopIcons
         }
         
+        if ($EnableDarkMode) {
+            Set-DarkMode
+        }
+        
+        Set-AccentColor -ColorScheme $AccentColor
+        Set-Fonts
+        
         Restart-Explorer
         Write-Log "Style configuration completed successfully"
     }
@@ -85,37 +194,12 @@ function Set-WindowsStyle {
     }
 }
 
-function Set-Fonts {
-    try {
-        Write-Log "Starting font installation..."
-        
-        # Install FiraCode Nerd Font using Chocolatey
-        Write-Log "Installing FiraCode Nerd Font..."
-        choco install nerd-fonts-firacode -y
-        
-        # Refresh font cache
-        Write-Log "Refreshing font cache..."
-        $FONTS = 0x14
-        $objShell = New-Object -ComObject Shell.Application
-        $objFolder = $objShell.Namespace($FONTS)
-        
-        # Release COM objects
-        $null = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($objShell)
-        $null = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($objFolder)
-        
-        Write-Log "Font installation and cache refresh completed successfully"
-        Write-Host "Font installation complete. Please restart WezTerm for the changes to take effect."
-    }
-    catch {
-        Write-Log "Error installing fonts: $_"
-        throw
-    }
-}
-
 # Return a hashtable of functions instead of using Export-ModuleMember
 @{
     'Set-WindowsStyle' = ${function:Set-WindowsStyle}
     'Hide-Taskbar' = ${function:Hide-Taskbar}
     'Hide-DesktopIcons' = ${function:Hide-DesktopIcons}
+    'Set-DarkMode' = ${function:Set-DarkMode}
+    'Set-AccentColor' = ${function:Set-AccentColor}
     'Set-Fonts' = ${function:Set-Fonts}
 }

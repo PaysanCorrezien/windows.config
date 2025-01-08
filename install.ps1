@@ -161,7 +161,9 @@ if (-not (Test-KeyboardLayout)) {
 # 4. Style Settings
 if (-not (Test-StageFlag "style-settings")) {
     Write-Status "Applying style settings..." -Status "In Progress" -Color "Yellow"
-    Set-WindowsStyle -HideTaskbar -HideDesktopIcons
+    
+    # Apply comprehensive style settings
+    Set-WindowsStyle -HideTaskbar -HideDesktopIcons -EnableDarkMode -AccentColor 'Ocean'
     if (-not $?) {
         if (-not (Handle-Error "Failed to apply style settings" "Style Settings")) {
             Exit-Script
