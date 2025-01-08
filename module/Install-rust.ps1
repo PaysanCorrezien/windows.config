@@ -1,12 +1,20 @@
 # Import utility functions
 $utils = . "$PSScriptRoot\utils.ps1"
 ${function:Test-Command} = $utils['Test-Command']
+${function:Install-WithWinget} = $utils['Install-WithWinget']
 
 function Test-RustInstallation {
     return (Test-Command "rustc") -and (Test-Command "cargo")
 }
 
 function Install-Rust {
+    # First install Visual Studio Build Tools
+    Write-Host "Installing Visual Studio Build Tools..." -ForegroundColor Green
+    if (-not (Install-WithWinget -PackageId "Microsoft.VisualStudio.2022.BuildTools" -Override "--wait --passive --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended")) {
+        Write-Error "Failed to install Visual Studio Build Tools"
+        return $false
+    }
+    
     Write-Host "Installing Rust via rustup..." -ForegroundColor Green
     
     # Download rustup-init

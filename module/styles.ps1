@@ -138,23 +138,13 @@ function Set-Fonts {
         
         foreach ($font in $fonts) {
             Write-Log "Installing $font..."
-            choco install $font -y
+            choco install $font -y --params '"/AllUsers"' --install-arguments='"/NoRestart"'
             if ($LASTEXITCODE -ne 0) {
                 Write-Log "Warning: Failed to install $font"
             }
         }
         
-        # Refresh font cache
-        Write-Log "Refreshing font cache..."
-        $FONTS = 0x14
-        $objShell = New-Object -ComObject Shell.Application
-        $objFolder = $objShell.Namespace($FONTS)
-        
-        # Release COM objects
-        $null = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($objShell)
-        $null = [System.Runtime.Interopservices.Marshal]::ReleaseComObject($objFolder)
-        
-        Write-Log "Font installation and cache refresh completed successfully"
+        Write-Log "Font installation completed successfully"
         Write-Host "Font installation complete. Please restart applications for the changes to take effect."
     }
     catch {

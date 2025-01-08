@@ -832,10 +832,29 @@ if (-not (Test-StageFlag "personal-repos-setup")) {
     }
     
     Write-Host "`nInitializing Chezmoi with dotfiles:" -ForegroundColor Yellow
-    if (-not (Invoke-ExternalCommand -Command "chezmoi init https://github.com/paysancorrezien/chezmoi-win.git" `
-            -Description "Initializing Chezmoi")) {
-        Handle-Error "Failed to initialize Chezmoi" "Chezmoi initialization"
+    
+    # Set safe directory
+    if (-not (Invoke-ExternalCommand -Command 'git config --global --add safe.directory C:/Users/admin/.local/share/chezmoi' `
+            -Description "Setting safe directory for chezmoi")) {
+        Handle-Error "Failed to set safe directory" "Chezmoi safe directory configuration"
     }
+    
+    # Clear existing chezmoi directory if it exists
+    $chezmoiDir = "C:/Users/admin/.local/share/chezmoi"
+    if (Test-Path $chezmoiDir) {
+        if (-not (Invoke-ExternalCommand -Command "Remove-Item -Recurse -Force $chezmoiDir" `
+                -Description "Clearing existing chezmoi directory")) {
+            Handle-Error "Failed to clear existing chezmoi directory" "Chezmoi directory cleanup"
+        }
+    }
+    
+    # Initialize and apply chezmoi
+    if (-not (Invoke-ExternalCommand -Command "chezmoi init https://github.com/PaysanCorrezien/chezmoi-win --apply" `
+            -Description "Initializing and applying Chezmoi configuration")) {
+        Handle-Error "Failed to initialize and apply Chezmoi" "Chezmoi initialization"
+    }
+    
+    Write-Host "`nChezmoi configuration has been applied." -ForegroundColor Green
     
     Write-Host "`nPlease review Chezmoi changes:" -ForegroundColor Yellow
     Write-Host "1. Review proposed changes with: chezmoi diff" -ForegroundColor Yellow
@@ -851,6 +870,50 @@ if (-not (Test-StageFlag "personal-repos-setup")) {
     Write-Status "Personal repositories" -Status "Already configured" -Color "Green"
 }
 
+# 19.5 CLI Utilities Installation
+if (-not (Test-StageFlag "cli-utils-setup")) {
+    Write-Status "Installing CLI utilities..." -Status "Starting" -Color "Yellow"
+    
+    # Install Winget packages
+    $cliUtils = @(
+        @{Id = "rsteube.Carapace"; Description = "Command completion"},
+        @{Id = "Slackadays.Clipboard"; Description = "Clipboard manager"},
+        @{Id = "Gitleaks.Gitleaks"; Description = "Git secrets scanner"},
+        @{Id = "lsd-rs.lsd"; Description = "LSDeluxe"}
+    )
+    
+    foreach ($util in $cliUtils) {
+        if (-not (Install-WithWinget -PackageId $util.Id)) {
+            if (-not (Handle-Error "Failed to install $($util.Description)" "$($util.Id) Installation" $Error[0])) {
+                Exit-Script
+                return
+            }
+        }
+    }
+    
+    # Install Atuin via Cargo
+    Write-Host "`nInstalling Atuin via Cargo..." -ForegroundColor Yellow
+    if (-not (Invoke-ExternalCommand -Command "cargo install atuin" `
+            -Description "Installing Atuin")) {
+        Handle-Error "Failed to install Atuin" "Atuin Installation"
+    }
+    
+    # Install BusyGit via pip
+    Write-Host "`nInstalling BusyGit..." -ForegroundColor Yellow
+    if (-not (Invoke-ExternalCommand -Command "python -m pip install git+https://github.com/PaysanCorrezien/BusyGit.git" `
+            -Description "Installing BusyGit")) {
+        Handle-Error "Failed to install BusyGit" "BusyGit Installation"
+    }
+    
+    # Reload PATH to ensure new utilities are available
+    Reload-Path
+    
+    Set-StageFlag "cli-utils-setup"
+    Write-Status "CLI utilities installation" -Status "Completed" -Color "Green"
+} else {
+    Write-Status "CLI utilities" -Status "Already installed" -Color "Green"
+}
+
 # 20. Final System Configurations
 if (-not (Test-StageFlag "final-system-config")) {
     Write-Status "Applying final system configurations..." -Status "Starting" -Color "Yellow"
@@ -861,6 +924,34 @@ if (-not (Test-StageFlag "final-system-config")) {
         Handle-Error "Failed to configure Git SSH command" "Git SSH command configuration"
     }
     Write-Status "Git SSH configuration" -Status "Completed" -Color "Green"
+    
+    # Configure startup programs
+    Write-Host "`nConfiguring startup programs..." -ForegroundColor Yellow
+    $startupFolder = "C:\ProgramData\Microsoft\Windows\Start Menu\Programs"
+    $glazeWMPath = Join-Path $startupFolder "GlazeWM.lnk"
+    
+    if (Test-Path $glazeWMPath) {
+        Write-Host "Adding GlazeWM to startup programs..." -ForegroundColor Yellow
+        Copy-Item $glazeWMPath "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\" -Force
+        Write-Status "GlazeWM startup configuration" -Status "Completed" -Color "Green"
+    } else {
+        Write-Warning "GlazeWM shortcut not found at expected location: $glazeWMPath"
+    }
+    
+    # Prompt for WezTerm float version installation
+    Write-Host "`nWould you like to install the custom float version of WezTerm?" -ForegroundColor Yellow
+    if (Get-UserConfirmation "Install custom WezTerm float version?") {
+        $weztermFloatScript = Join-Path $PSScriptRoot "scripts\install-wezterm-float.ps1"
+        if (Test-Path $weztermFloatScript) {
+            if (-not (Invoke-ExternalCommand -Command "& '$weztermFloatScript'" `
+                    -Description "Installing WezTerm float version")) {
+                Handle-Error "Failed to install WezTerm float version" "WezTerm Installation"
+            }
+            Write-Status "WezTerm float version" -Status "Installed" -Color "Green"
+        } else {
+            Write-Warning "WezTerm float installation script not found at: $weztermFloatScript"
+        }
+    }
     
     # Rename computer
     $currentName = $env:COMPUTERNAME
