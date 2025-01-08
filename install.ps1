@@ -163,7 +163,7 @@ if (-not (Test-StageFlag "style-settings")) {
     Write-Status "Applying style settings..." -Status "In Progress" -Color "Yellow"
     
     # Apply comprehensive style settings
-    Set-WindowsStyle -HideTaskbar -HideDesktopIcons -EnableDarkMode -AccentColor 'Ocean'
+    Set-WindowsStyle -HideTaskbar -HideDesktopIcons -EnableDarkMode -AccentColor 'Rose'
     if (-not $?) {
         if (-not (Handle-Error "Failed to apply style settings" "Style Settings")) {
             Exit-Script

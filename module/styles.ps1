@@ -92,7 +92,7 @@ function Set-AccentColor {
         # Color values in ARGB format (FF + RGB hex)
         $colorMap = @{
             'Default' = 'FF0078D7'  # Windows blue
-            'Rose'    = 'FF191724'  # Rose Pine base #191724
+            'Rose'    = 'FF191724'  # Rose Pine base color
             'Sky'     = 'FF2B90E3'  # Light blue
             'Purple'  = 'FF8A3D8B'  # Royal purple
             'Orange'  = 'FFF7833B'  # Vibrant orange
@@ -103,17 +103,20 @@ function Set-AccentColor {
         $colorHex = $colorMap[$ColorScheme]
         $colorDecimal = [convert]::ToInt32($colorHex, 16)
         
-        Write-Log "Converting color $colorHex to decimal: $colorDecimal"
+        Write-Log "Setting color $colorHex (decimal: $colorDecimal)"
         
-        # Enable Windows color scheme
-        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "ColorPrevalence" -Value 1
-        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "ColorPrevalence" -Value 1
-        
-        # Set accent color
+        # Set accent color in all required locations
         Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "AccentColor" -Value $colorDecimal -Type "DWORD"
         Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent" -Name "AccentColor" -Value $colorDecimal -Type "DWORD"
         
+        # Enable accent color on title bars and windows borders
+        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\DWM" -Name "ColorPrevalence" -Value 1 -Type "DWORD"
+        Set-RegistryValue -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" -Name "ColorPrevalence" -Value 1 -Type "DWORD"
+        
         Write-Log "Accent color set successfully"
+        
+        # Restart explorer to apply changes
+        Restart-Explorer
     }
     catch {
         Write-Log "Error setting accent color: $_"
@@ -172,10 +175,9 @@ function Install-Cursor {
             throw "Cursor source directory not found at: $cursorSourcePath"
         }
 
-        # Create Windows Cursors directory with simple name
+        # Create Windows Cursors directory
         $windowsCursorDir = "$env:SystemRoot\Cursors"
-        $schemeName = "BreezeX-RosePine"  # Simplified name without accents
-        $schemeDir = Join-Path $windowsCursorDir $schemeName
+        $schemeDir = Join-Path $windowsCursorDir "BreezeX-RosePine"
         
         # Recreate the directory to ensure it's clean
         if (Test-Path $schemeDir) {
@@ -183,45 +185,18 @@ function Install-Cursor {
         }
         New-Item -ItemType Directory -Path $schemeDir -Force | Out-Null
 
-        # Copy all cursor files from source to Windows directory
+        # Copy all cursor files
         Write-Log "Copying cursor files from $cursorSourcePath to $schemeDir"
         Copy-Item -Path "$cursorSourcePath\*" -Destination $schemeDir -Include "*.cur","*.ani","*.inf" -Force
-        
-        # Verify files were copied
-        $copiedFiles = Get-ChildItem -Path $schemeDir
-        Write-Log "Copied files: $($copiedFiles.Name -join ', ')"
 
-        # Read and modify the .inf file to remove accents
+        # Install cursor using the .inf file
         $infPath = Join-Path $schemeDir "install.inf"
-        if (-not (Test-Path $infPath)) {
-            throw "Cursor install.inf not found at: $infPath"
-        }
-
-        # Read the .inf content and replace accented characters
-        $infContent = Get-Content -Path $infPath -Raw
-        $infContent = $infContent -replace "é", "e" -replace "è", "e" -replace "à", "a"
-        $infContent = $infContent -replace "BreezeX-RoséPine", "BreezeX-RosePine"
-        Set-Content -Path $infPath -Value $infContent -Force
-
-        # Install cursor using the modified .inf file
         Write-Log "Installing cursor using $infPath"
         $result = Start-Process "rundll32.exe" -ArgumentList "setupapi,InstallHinfSection DefaultInstall 132 $infPath" -Wait -NoNewWindow -PassThru
         
         if ($result.ExitCode -ne 0) {
             throw "Failed to install cursor scheme. Exit code: $($result.ExitCode)"
         }
-
-        # Set the cursor scheme in registry
-        $cursorsKey = "HKCU:\Control Panel\Cursors"
-        Set-ItemProperty -Path $cursorsKey -Name "(default)" -Value $schemeName
-
-        # Force cursor update
-        $signature = @'
-[DllImport("user32.dll", SetLastError = true)]
-public static extern bool SystemParametersInfo(uint uiAction, uint uiParam, String pvParam, uint fWinIni);
-'@
-        $systemParamInfo = Add-Type -MemberDefinition $signature -Name WinAPICall -Namespace SystemParamInfo -PassThru
-        $systemParamInfo::SystemParametersInfo(0x0057, 0, $null, 0x03) | Out-Null
 
         Write-Log "Cursor installation completed successfully"
         Write-Host "Cursor scheme has been installed. Changes should take effect immediately."
