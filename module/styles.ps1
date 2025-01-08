@@ -174,7 +174,7 @@ function Install-Cursor {
 
         # Create Windows Cursors directory with simple name
         $windowsCursorDir = "$env:SystemRoot\Cursors"
-        $schemeName = "RosePineCursors"
+        $schemeName = "BreezeX-RosePine"  # Simplified name without accents
         $schemeDir = Join-Path $windowsCursorDir $schemeName
         
         # Recreate the directory to ensure it's clean
@@ -191,12 +191,19 @@ function Install-Cursor {
         $copiedFiles = Get-ChildItem -Path $schemeDir
         Write-Log "Copied files: $($copiedFiles.Name -join ', ')"
 
+        # Read and modify the .inf file to remove accents
         $infPath = Join-Path $schemeDir "install.inf"
         if (-not (Test-Path $infPath)) {
             throw "Cursor install.inf not found at: $infPath"
         }
 
-        # Install cursor using the .inf file
+        # Read the .inf content and replace accented characters
+        $infContent = Get-Content -Path $infPath -Raw
+        $infContent = $infContent -replace "é", "e" -replace "è", "e" -replace "à", "a"
+        $infContent = $infContent -replace "BreezeX-RoséPine", "BreezeX-RosePine"
+        Set-Content -Path $infPath -Value $infContent -Force
+
+        # Install cursor using the modified .inf file
         Write-Log "Installing cursor using $infPath"
         $result = Start-Process "rundll32.exe" -ArgumentList "setupapi,InstallHinfSection DefaultInstall 132 $infPath" -Wait -NoNewWindow -PassThru
         
