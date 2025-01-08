@@ -879,7 +879,10 @@ if (-not (Test-StageFlag "cli-utils-setup")) {
         @{Id = "rsteube.Carapace"; Description = "Command completion"},
         @{Id = "Slackadays.Clipboard"; Description = "Clipboard manager"},
         @{Id = "Gitleaks.Gitleaks"; Description = "Git secrets scanner"},
-        @{Id = "lsd-rs.lsd"; Description = "LSDeluxe"}
+        @{Id = "lsd-rs.lsd"; Description = "LSDeluxe"},
+        @{Id = "Starship.Starship"; Description = "Prompt"},
+        @{Id = "XAMPPRocky.tokei"; Description = "Code metrics"},
+        @{Id = "Gitleaks.Gitleaks"; Description = "Git secrets scanner"}
     )
     
     foreach ($util in $cliUtils) {
