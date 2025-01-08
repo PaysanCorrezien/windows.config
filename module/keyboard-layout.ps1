@@ -53,41 +53,35 @@ function Install-CustomLayout {
 }
 
 function Get-CustomLayoutCode {
-    # Get all available keyboard layouts
+    # First try to find the layout in the registry
+    $layouts = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layouts\*' -ErrorAction SilentlyContinue
+    foreach ($layout in $layouts) {
+        # Look specifically for our custom Alt International layout
+        if ($layout.PSObject.Properties['Layout File']?.Value -eq 'intl-alt.dll') {
+            $layoutId = $layout.PSChildName
+            $code = "0409:$layoutId"
+            Write-Host "Found Alt International layout in registry: $code" -ForegroundColor Cyan
+            return $code
+        }
+    }
+    
+    # If not found in registry, check language list
     $layouts = Get-WinUserLanguageList
     foreach ($lang in $layouts) {
         foreach ($layout in $lang.InputMethodTips) {
-            # Look specifically for the Alt Gr dead keys layout
-            if ($layout -match 'Alt Gr dead keys|ALTGR|a0010409|a0000409') {
-                Write-Host "Found custom layout: $layout" -ForegroundColor Cyan
+            # Look for our specific Alt International layout
+            if ($layout -match 'intl-alt') {
+                Write-Host "Found Alt International layout in language list: $layout" -ForegroundColor Cyan
                 return $layout
             }
         }
     }
-    
-    # If not found in language list, check registry
-    $layouts = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layouts\*' -ErrorAction SilentlyContinue
-    foreach ($layout in $layouts) {
-        # Check both Layout File and Layout Display Name properties
-        $layoutFile = $layout.PSObject.Properties['Layout File']?.Value
-        $layoutName = $layout.PSObject.Properties['Layout Display Name']?.Value
-        $layoutId = $layout.PSChildName
-        
-        if (($layoutFile -and $layoutFile -match 'intl-alt\.dll') -or 
-            ($layoutName -and $layoutName -match 'Alt Gr dead keys') -or
-            $layoutId -match 'a0010409|a0000409') {
-            $code = "0409:$layoutId"
-            Write-Host "Found custom layout in registry: $code" -ForegroundColor Cyan
-            return $code
-        }
-    }
 
-    # Last resort: check for the known layout IDs
-    $knownLayoutIds = @("0409:a0010409", "0409:a0000409")
-    foreach ($layoutId in $knownLayoutIds) {
-        Write-Host "Trying known layout ID: $layoutId" -ForegroundColor Yellow
-        return $layoutId
-    }
+    # If still not found, check for the specific layout ID we installed
+    $layoutId = "a0000409"  # This is the ID of our Alt International layout
+    $code = "0409:$layoutId"
+    Write-Host "Using default Alt International layout ID: $code" -ForegroundColor Yellow
+    return $code
 }
 
 function Ensure-EnglishLanguage {
@@ -150,7 +144,12 @@ function Ensure-EnglishLanguage {
 function Remove-AllOtherLayouts {
     # Remove all other keyboard layouts from registry
     $customLayout = Get-CustomLayoutCode
-    if (-not $customLayout) { return }
+    if (-not $customLayout) { 
+        Write-Host "✗ Could not find Alt International layout. Please ensure it's properly installed." -ForegroundColor Red
+        return 
+    }
+
+    Write-Host "Setting Alt International layout ($customLayout) as default..." -ForegroundColor Yellow
 
     # Force English and remove other languages first
     Ensure-EnglishLanguage
@@ -221,6 +220,12 @@ function Remove-AllOtherLayouts {
     # Set as only language
     $languageList = @($enUS)
     Set-WinUserLanguageList $languageList -Force
+
+    # Remove any other preloaded layouts
+    $substitutes = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layout\Substitutes" -ErrorAction SilentlyContinue
+    if ($substitutes) {
+        Remove-Item -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Keyboard Layout\Substitutes" -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Set-SingleCustomKeyboard {
