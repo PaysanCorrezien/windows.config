@@ -313,7 +313,7 @@ function Update-GitRepository {
             # Check for unstaged changes
             $status = git status --porcelain
             if ($status) {
-                Write-Host "Unstaged changes found in $displayName:" -ForegroundColor Yellow
+                Write-Host "Unstaged changes found in $displayName :" -ForegroundColor Yellow
                 git status --short
                 
                 # Ask user what to do with changes
