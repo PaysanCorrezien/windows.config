@@ -976,5 +976,37 @@ if (-not (Test-StageFlag "final-system-config")) {
     Write-Status "Final system configurations" -Status "Already configured" -Color "Green"
 }
 
+# 21. Update Configurations
+Write-Status "Updating configuration repositories..." -Status "Starting" -Color "Yellow"
+
+# Define repositories to update
+$configRepos = @(
+    @{
+        Path = Join-Path $env:USERPROFILE "repo\config.wezterm"
+        Description = "WezTerm Configuration"
+    },
+    @{
+        Path = Join-Path $env:USERPROFILE "repo\pythonautomation"
+        Description = "Python Automation Scripts"
+    },
+    @{
+        Path = Join-Path $env:USERPROFILE ".local\share\chezmoi"
+        Description = "Chezmoi Dotfiles"
+    },
+    @{
+        Path = Join-Path $env:LOCALAPPDATA "nvim"
+        Description = "Neovim Configuration"
+    }
+)
+
+# Update each repository
+foreach ($repo in $configRepos) {
+    if (-not (Update-GitRepository -RepoPath $repo.Path -Description $repo.Description)) {
+        Write-Warning "Failed to update $($repo.Description)"
+    }
+}
+
+Write-Status "Configuration updates" -Status "Completed" -Color "Green"
+
 Write-Host "`nInstallation completed successfully!`n" -ForegroundColor Green
 Pause-Script 

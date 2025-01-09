@@ -282,6 +282,92 @@ function Install-WithWinget {
     }
 }
 
+function Update-GitRepository {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$RepoPath,
+        [string]$Description = ""
+    )
+    
+    try {
+        if (-not (Test-Path $RepoPath)) {
+            Write-Warning "Repository path does not exist: $RepoPath"
+            return $false
+        }
+
+        Push-Location $RepoPath
+        
+        try {
+            # Check if it's a git repository
+            $null = git rev-parse --git-dir 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "$RepoPath is not a git repository"
+                return $false
+            }
+
+            $repoName = Split-Path $RepoPath -Leaf
+            $displayName = if ($Description) { "$Description ($repoName)" } else { $repoName }
+            
+            Write-Host "`nChecking $displayName..." -ForegroundColor Cyan
+            
+            # Check for unstaged changes
+            $status = git status --porcelain
+            if ($status) {
+                Write-Host "Unstaged changes found in $displayName:" -ForegroundColor Yellow
+                git status --short
+                
+                # Ask user what to do with changes
+                $choices = @(
+                    [System.Management.Automation.Host.ChoiceDescription]::new("&Commit", "Commit and push changes")
+                    [System.Management.Automation.Host.ChoiceDescription]::new("&Stash", "Stash changes and pull")
+                    [System.Management.Automation.Host.ChoiceDescription]::new("&Skip", "Skip this repository")
+                )
+                
+                $decision = $Host.UI.PromptForChoice("", "What would you like to do with these changes?", $choices, 2)
+                
+                switch ($decision) {
+                    0 { # Commit and push
+                        $commitMsg = Read-Host "Enter commit message"
+                        git add .
+                        git commit -m $commitMsg
+                        git push
+                        if ($LASTEXITCODE -ne 0) {
+                            throw "Failed to push changes"
+                        }
+                    }
+                    1 { # Stash
+                        git stash
+                        if ($LASTEXITCODE -ne 0) {
+                            throw "Failed to stash changes"
+                        }
+                    }
+                    2 { # Skip
+                        Write-Host "Skipping $displayName" -ForegroundColor Yellow
+                        return $true
+                    }
+                }
+            }
+            
+            # Pull changes
+            Write-Host "Pulling latest changes for $displayName..." -ForegroundColor Yellow
+            $pullOutput = git pull 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to pull changes: $pullOutput"
+            }
+            
+            Write-Host "$displayName is up to date" -ForegroundColor Green
+            return $true
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    catch {
+        Write-Error "Error updating $RepoPath`: $_"
+        return $false
+    }
+}
+
 # Export functions
 $exports = @{
     'Write-Status' = ${function:Write-Status}
@@ -293,6 +379,7 @@ $exports = @{
     'Reload-Path' = ${function:Reload-Path}
     'Test-Command' = ${function:Test-Command}
     'Install-WithWinget' = ${function:Install-WithWinget}
+    'Update-GitRepository' = ${function:Update-GitRepository}
 }
 
 return $exports
