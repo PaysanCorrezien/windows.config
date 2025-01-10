@@ -1,8 +1,4 @@
-// name: Rosé Pine
-// author: thuanowa
-// license: unlicense
 // upstream: https://github.com/rose-pine/surfingkeys/blob/main/dist/rose-pine.conf
-// blurb: All natural pine, faux fur and a bit of soho vibes for the classy minimalist
 
 const hintsCss =
   "font-size: 13pt; font-family: 'JetBrains Mono NL', 'Cascadia Code', 'Helvetica Neue', Helvetica, Arial, sans-serif; border: 0px; color: #e0def4 !important; background: #191724; background-color: #191724";
@@ -481,7 +477,6 @@ settings.theme += `
     background-color: var(--theme-ace-cursor) !important;
     border: var(--theme-ace-cursor) !important;
 }
-
 .ace_marker-layer .ace_selection {
     background: var(--theme-ace-select) !important;
 }
@@ -510,9 +505,7 @@ settings.theme += `
 // General settings
 settings.omnibarSuggestionTimeout = 20; // Faster omnibar suggestions (default was 200ms)
 settings.omnibarPosition = "middle"; // Center omnibar
-
 settings.richHintsForKeystroke = 20; // Faster rich hints (default was 500ms)
-
 // Focus control settings
 settings.stealFocusOnLoad = false; // Prevent stealing focus when page loads
 settings.enableAutoFocus = false; // Disable auto-focus after clicking widgets
@@ -534,18 +527,20 @@ api.cmap("<Ctrl-n>", "<Tab>");
 api.cmap("<Ctrl-p>", "<Shift-Tab>");
 
 // --- Navigation ---
-// Clipboard operations
-api.mapkey("p", "Open the clipboard's URL in the current tab", () => {
-  Front.getContentFromClipboard(function (response) {
-    window.location.href = response.data;
-  });
-});
-// URL and Tab Operations
-//api.map("o", ">_t"); // Open URLs (saved from default 't')
+
 //api.map("t", "on"); // New tab
 api.map("b", "T"); // Choose a buffer/tab
 api.map("O", "go");
 //api.map("T", ";u"); // Edit current URL in new tab
+
+api.map("V", "zv"); //Visual select whole object
+
+// api.mapkey("F", "Open link in current tab", () => api.Hints.create("*[href]", (e) => location.assign(e.href)));
+api.mapkey("F", "Open a link in a new active tab", function () {
+  api.Hints.create("*[href]", function (element) {
+    window.open(element.href, "_blank");
+  });
+});
 
 // Scrolling
 api.mapkey("<Ctrl-d>", "Scroll down", () => {
@@ -568,14 +563,7 @@ api.map("<", "<<"); // Move Tab Left
 
 // Add custom search aliases
 api.addSearchAlias("ama", "amazon", "https://www.amazon.com/s?k=", "s");
-api.addSearchAlias("gh", "github", "https://github.com/search?q=", "s");
 api.addSearchAlias("r", "reddit", "https://www.reddit.com/search?q=", "s");
-api.addSearchAlias(
-  "wiki",
-  "wikipedia",
-  "https://en.wikipedia.org/wiki/Special:Search/",
-  "s",
-);
 
 // Remove default search aliases
 api.removeSearchAlias("b", "s");
