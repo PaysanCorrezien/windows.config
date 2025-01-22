@@ -11,6 +11,12 @@ $script:styles = . "$modulePath\styles.ps1"
 $script:neovimMenu = . "$modulePath\setup-neovim-menu-entry.ps1"
 $script:keyboardLayout = . "$modulePath\keyboard-layout.ps1"
 $script:rustInstall = . "$modulePath\Install-rust.ps1"
+$script:installStages = . "$modulePath\install-stages.ps1"
+$script:systemConfig = . "$modulePath\system-config.ps1"
+$script:packageManagement = . "$modulePath\package-management.ps1"
+$script:appInstallations = . "$modulePath\app-installations.ps1"
+$script:workSetup = . "$modulePath\work-setup.ps1"
+$script:edgeConfig = . "$modulePath\edge-config.ps1"
 
 # Import functions into current scope for easier access
 ${function:Write-Status} = $utils['Write-Status']
@@ -22,122 +28,27 @@ ${function:Set-Env} = $utils['Set-Env']
 ${function:Reload-Path} = $utils['Reload-Path']
 ${function:Test-Command} = $utils['Test-Command']
 ${function:Install-WithWinget} = $utils['Install-WithWinget']
-
-function Get-UserConfirmation {
-    param (
-        [string]$Message
-    )
-    $title = "Confirmation Required"
-    $choices = @(
-        [System.Management.Automation.Host.ChoiceDescription]::new("&Yes", "The action was successful")
-        [System.Management.Automation.Host.ChoiceDescription]::new("&No", "The action failed or needs to be retried")
-    )
-    $decision = $Host.UI.PromptForChoice($title, $Message, $choices, 0)
-    return $decision -eq 0
-}
-
-function Test-ScoopInstallation {
-    return Test-Command "scoop"
-}
-
-function Handle-Error {
-    param (
-        [string]$ErrorMessage,
-        [string]$Stage,
-        [System.Management.Automation.ErrorRecord]$ErrorRecord = $null
-    )
-    Write-Error $ErrorMessage
-    Write-Host "`nAn error occurred during $Stage." -ForegroundColor Red
-    
-    if ($ErrorRecord) {
-        Write-Host "`nDetailed Error Information:" -ForegroundColor Yellow
-        Write-Host "Exception Type: $($ErrorRecord.Exception.GetType().FullName)" -ForegroundColor Yellow
-        Write-Host "Exception Message: $($ErrorRecord.Exception.Message)" -ForegroundColor Yellow
-        Write-Host "Error Category: $($ErrorRecord.CategoryInfo.Category)" -ForegroundColor Yellow
-        if ($ErrorRecord.ScriptStackTrace) {
-            Write-Host "`nStack Trace:" -ForegroundColor Yellow
-            Write-Host $ErrorRecord.ScriptStackTrace -ForegroundColor Gray
-        }
-    }
-
-    Write-Host "`nYou can investigate the error before deciding to continue or exit." -ForegroundColor Yellow
-    if (-not (Get-UserConfirmation "Would you like to continue with the rest of the installation?")) {
-        Write-Host "Script stopped. You can run it again after fixing the issue." -ForegroundColor Yellow
-        Write-Host "Press any key to exit..." -ForegroundColor Yellow
-        $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-        return $false
-    }
-    Write-Host "Continuing with the next step..." -ForegroundColor Green
-    return $true
-}
-
-function Pause-Script {
-    Write-Host "Press any key to continue..." -ForegroundColor Yellow
-    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-}
-
-function Exit-Script {
-    Write-Host "Press any key to exit..." -ForegroundColor Yellow
-    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-    return
-}
+${function:Get-UserConfirmation} = $utils['Get-UserConfirmation']
+${function:Handle-Error} = $utils['Handle-Error']
+${function:Pause-Script} = $utils['Pause-Script']
+${function:Exit-Script} = $utils['Exit-Script']
 
 # Main installation process
 Write-Host "`nStarting installation process...`n" -ForegroundColor Cyan
 
 # 1. Initial Windows Setup - Windows Utility
 if (-not (Test-StageFlag "windows-utility")) {
-    Write-Status "Running Windows setup utility..." -Status "Starting" -Color "Yellow"
-    
-    try {
-        # Run the command directly
-        Write-Host "Running Windows setup utility..." -ForegroundColor Yellow
-        Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"irm christitus.com/win | iex`"" -Wait -Verb RunAs
-        
-        Write-Host "`nPlease review and complete the Windows setup utility configuration." -ForegroundColor Yellow
-        if (Get-UserConfirmation "Did you successfully complete the Windows setup utility configuration?") {
-            Set-StageFlag "windows-utility"
-            Write-Status "Windows setup utility" -Status "Completed" -Color "Green"
-        } else {
-            Write-Host "Windows setup utility was not completed successfully." -ForegroundColor Red
-            Write-Host "Press any key to exit..." -ForegroundColor Yellow
-            $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-            return
-        }
-    } catch {
-        Write-Warning "Windows setup utility encountered an error: $_"
-        Write-Host "You can try running it manually by opening a new PowerShell window and running:" -ForegroundColor Yellow
-        Write-Host "irm christitus.com/win | iex" -ForegroundColor Cyan
-        if (-not (Get-UserConfirmation "Would you like to continue with the rest of the installation?")) {
-            Write-Host "Press any key to exit..." -ForegroundColor Yellow
-            $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-            return
-        }
+    if (-not (& $installStages['Install-WindowsUtility'])) {
+        Exit-Script
+        return
     }
 }
 
 # 2. Initial Windows Setup - Activation
 if (-not (Test-StageFlag "windows-activation")) {
-    Write-Status "Running Windows activation..." -Status "Starting" -Color "Yellow"
-    
-    # Activate Windows
-    if (-not (Invoke-ExternalCommand -Command 'irm https://get.activated.win | iex' `
-            -Description "Windows Activation" -UseShell)) {
-        if (-not (Handle-Error "Failed to activate Windows" "Windows Activation")) {
-            Exit-Script
-            return
-        }
-    } else {
-        Write-Host "`nPlease verify that Windows was activated correctly." -ForegroundColor Yellow
-        if (Get-UserConfirmation "Was Windows activated successfully?") {
-            Set-StageFlag "windows-activation"
-            Write-Status "Windows activation" -Status "Completed" -Color "Green"
-        } else {
-            if (-not (Handle-Error "Windows activation was not completed successfully" "Windows Activation")) {
-                Exit-Script
-                return
-            }
-        }
+    if (-not (& $installStages['Install-WindowsActivation'])) {
+        Exit-Script
+        return
     }
 }
 
@@ -161,8 +72,6 @@ if (-not (Test-KeyboardLayout)) {
 # 4. Style Settings
 if (-not (Test-StageFlag "style-settings")) {
     Write-Status "Applying style settings..." -Status "In Progress" -Color "Yellow"
-    
-    # Apply comprehensive style settings
     Set-WindowsStyle -HideTaskbar -HideDesktopIcons -EnableDarkMode -AccentColor 'Rose'
     if (-not $?) {
         if (-not (Handle-Error "Failed to apply style settings" "Style Settings")) {
@@ -173,840 +82,113 @@ if (-not (Test-StageFlag "style-settings")) {
         Set-StageFlag "style-settings"
         Write-Status "Style settings" -Status "Applied" -Color "Green"
     }
-} else {
-    Write-Status "Style settings" -Status "Already configured" -Color "Green"
 }
 
-# 5. Scoop Installation
-if (-not (Test-ScoopInstallation)) {
-    Write-Status "Installing Scoop..." -Status "Starting" -Color "Yellow"
-    
-    try {
-        # Create a temporary script file for Scoop installation
-        $tempScriptPath = Join-Path $env:TEMP "install-scoop.ps1"
-        @'
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-Invoke-RestMethod -Uri get.scoop.sh | Invoke-Expression
-'@ | Set-Content -Path $tempScriptPath
-
-        # Start a new non-elevated PowerShell process to run the script
-        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-        $startInfo.FileName = "powershell.exe"
-        $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command `"& '$tempScriptPath'`""
-        $startInfo.UseShellExecute = $true
-        $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Normal
-        
-        Write-Host "Starting Scoop installation in a new window. Please wait for it to complete..." -ForegroundColor Yellow
-        $process = [System.Diagnostics.Process]::Start($startInfo)
-        $process.WaitForExit()
-
-        # Clean up the temporary script
-        Remove-Item -Path $tempScriptPath -Force -ErrorAction SilentlyContinue
-
-        if ($process.ExitCode -ne 0) {
-            throw "Scoop installation process exited with code: $($process.ExitCode)"
-        }
-
-        # Verify Scoop installation
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-        if (-not (Get-Command "scoop" -ErrorAction SilentlyContinue)) {
-            throw "Scoop command not found after installation"
-        }
-
-        # Add main bucket
-        Write-Host "Adding Scoop main bucket..." -ForegroundColor Yellow
-        if (-not (Invoke-ExternalCommand -Command 'scoop bucket add main' -Description "Adding Scoop main bucket")) {
-            throw "Failed to add Scoop main bucket"
-        }
-        
-        Write-Status "Scoop installation" -Status "Completed" -Color "Green"
+# 5. OpenSSH Setup
+if (-not (& $systemConfig['Set-OpenSSH'])) {
+    if (-not (Handle-Error "Failed to set up OpenSSH" "OpenSSH Setup")) {
+        Exit-Script
+        return
     }
-    catch {
-        if (-not (Handle-Error "Error during Scoop installation: $_" "Scoop Installation")) {
-            Write-Host "`nYou can try installing Scoop manually:" -ForegroundColor Yellow
-            Write-Host "1. Open a new PowerShell window (non-admin)" -ForegroundColor Yellow
-            Write-Host "2. Run this command:" -ForegroundColor Yellow
-            Write-Host "   irm get.scoop.sh | iex" -ForegroundColor Cyan
-            Exit-Script
-            return
-        }
-    }
-} else {
-    Write-Status "Scoop" -Status "Already installed" -Color "Green"
 }
 
-# 6. Rust Installation
-Write-Status "Checking Rust installation..." -Status "Checking" -Color "Yellow"
-if (-not (Test-RustInstallation)) {
-    Write-Host "Installing Rust..." -ForegroundColor Yellow
-    Install-Rust
-    if (-not $?) {
-        Handle-Error "Failed to install Rust" "Rust Installation"
-    } else {
-        Write-Status "Rust installation" -Status "Installed" -Color "Green"
-    }
-} else {
-    Write-Status "Rust" -Status "Already installed" -Color "Green"
-}
-
-# 7. Yazi Dependencies
-if (-not (Test-StageFlag "yazi-deps")) {
-    Write-Status "Installing Yazi and dependencies..." -Status "Starting" -Color "Yellow"
-    
-    # Check for Python
-    if (-not (Test-Command "python")) {
-        Write-Status "Python not found. Installing Python..." -Status "Starting" -Color "Yellow"
-        if (-not (Install-WithWinget -PackageId "Python.Python.3.11")) {
-            if (-not (Handle-Error "Failed to install Python" "Python Installation" $Error[0])) {
-                Exit-Script
-                return
-            }
-            }
-            Reload-Path
-    }
-    
-    # Add Git usr/bin to PATH for Yazi
-    $gitUsrBinPath = "C:\Program Files\Git\usr\bin"
-    if (Test-Path $gitUsrBinPath) {
-        try {
-            if (-not (Invoke-ExternalCommand -Command "Set-Env -Name 'PATH' -Value '$gitUsrBinPath' -Scope 'Machine' -Verbose" `
-                    -Description "Adding Git usr/bin to PATH")) {
-                Handle-Error "Failed to add Git usr/bin to PATH" "Git usr/bin to PATH" $Error[0]
-            }
-            Reload-Path
-        }
-        catch {
-            Handle-Error "Failed to add Git usr/bin to PATH: $_" "Git usr/bin to PATH" $_
-        }
-    } else {
-        Handle-Error "Git usr/bin path not found at $gitUsrBinPath. Please ensure Git is installed correctly." "Git usr/bin path"
-    }
-    
-    # Install Yazi
-    if (-not (Install-WithWinget -PackageId "sxyazi.yazi")) {
-        if (-not (Handle-Error "Failed to install Yazi" "Yazi Installation" $Error[0])) {
-            Exit-Script
-            return
-        }
-    }
-    
-    # Install dependencies
-    $deps = @(
-        "Gyan.FFmpeg",
-        "7zip.7zip",
-        "jqlang.jq",
-        "sharkdp.fd",
-        "BurntSushi.ripgrep.MSVC",
-        "junegunn.fzf",
-        "ajeetdsouza.zoxide",
-        "ImageMagick.ImageMagick",
-        "charmbracelet.glow"
-    )
-    
-    foreach ($dep in $deps) {
-        if (-not (Install-WithWinget -PackageId $dep)) {
-            if (-not (Handle-Error "Failed to install $dep" "Installing $dep" $Error[0])) {
-                Write-Host "`nYou can try installing $dep manually using:" -ForegroundColor Yellow
-                Write-Host "winget install --exact --id $dep" -ForegroundColor Cyan
-                Exit-Script
-                return
-            }
-        }
-    }
-    
-    # Install rich-cli via pip
-    try {
-        Write-Host "Installing rich-cli..." -ForegroundColor Yellow
-        $pipOutput = python -m pip install rich-cli --quiet 2>&1
-        $exitCode = $LASTEXITCODE
-
-        if ($exitCode -ne 0) {
-            $errorDetail = $pipOutput | Out-String
-            if (-not (Handle-Error "Failed to install rich-cli (Exit code: $exitCode)`nInstallation output:`n$errorDetail" "rich-cli Installation" $Error[0])) {
-                Write-Host "`nYou can try installing rich-cli manually using:" -ForegroundColor Yellow
-                Write-Host "python -m pip install rich-cli" -ForegroundColor Cyan
-                Exit-Script
-                return
-            }
-        } else {
-            Write-Host "rich-cli installation completed successfully" -ForegroundColor Green
-        }
-    }
-    catch {
-        $errorDetail = $_.Exception.Message
-        $stackTrace = $_.ScriptStackTrace
-        if (-not (Handle-Error "Failed to install rich-cli with error: $errorDetail`nStack trace: $stackTrace" "rich-cli Installation" $_)) {
-            Write-Host "`nYou can try installing rich-cli manually using:" -ForegroundColor Yellow
-            Write-Host "python -m pip install rich-cli" -ForegroundColor Cyan
-            Exit-Script
-            return
-        }
-    }
-    
-    # Reload PATH after installing all dependencies
-    Reload-Path
-    
-    Set-StageFlag "yazi-deps"
-    Write-Status "Yazi dependencies" -Status "Completed" -Color "Green"
-} else {
-    Write-Status "Yazi dependencies" -Status "Already installed" -Color "Green"
-}
-
-# 8. Nextcloud Setup
-if (-not (Test-StageFlag "nextcloud-setup")) {
-    Write-Status "Installing Nextcloud..." -Status "Starting" -Color "Yellow"
-    
-    try {
-        # First check if already installed
-        $checkOutput = winget list --id Nextcloud.NextcloudDesktop 2>&1
-        if ($checkOutput -match "Nextcloud.NextcloudDesktop") {
-            Write-Host "Nextcloud is already installed" -ForegroundColor Green
-        } else {
-            # Try to install with detailed error capture
-            Write-Host "Installing Nextcloud..." -ForegroundColor Yellow
-            if (-not (Install-WithWinget -PackageId "Nextcloud.NextcloudDesktop")) {
-                if (-not (Handle-Error "Failed to install Nextcloud" "Nextcloud Installation" $Error[0])) {
-                    Exit-Script
-                    return
-            }
-        }
-
-        Write-Host "`nPlease:" -ForegroundColor Yellow
-        Write-Host "1. Launch Nextcloud" -ForegroundColor Yellow
-        Write-Host "2. Log in to your account" -ForegroundColor Yellow
-        Write-Host "3. Configure sync settings" -ForegroundColor Yellow
-        Write-Host "4. Verify sync is working" -ForegroundColor Yellow
-        
-        if (Get-UserConfirmation "Did you successfully set up Nextcloud and verify sync is working?") {
-            Set-StageFlag "nextcloud-setup"
-            Write-Status "Nextcloud setup" -Status "Completed" -Color "Green"
-        } else {
-            if (-not (Handle-Error "Nextcloud setup was not completed successfully" "Nextcloud Setup")) {
-                Exit-Script
-                return
-                }
-            }
-        }
-    }
-    catch {
-        $errorDetail = $_.Exception.Message
-        $stackTrace = $_.ScriptStackTrace
-        if (-not (Handle-Error "Failed to install Nextcloud with error: $errorDetail`nStack trace: $stackTrace" "Nextcloud Installation" $_)) {
-            Write-Host "`nYou can try installing Nextcloud manually using:" -ForegroundColor Yellow
-            Write-Host "winget install --exact --id Nextcloud.NextcloudDesktop" -ForegroundColor Cyan
-            Exit-Script
-            return
-        }
-    }
-} else {
-    Write-Status "Nextcloud" -Status "Already installed" -Color "Green"
-}
-
-# 9. UniGet UI Setup
-if (-not (Test-StageFlag "uniget-setup")) {
-    Write-Status "Installing UniGet UI..." -Status "Starting" -Color "Yellow"
-    
-    try {
-        # First check if already installed
-        $checkOutput = winget list --id MartiCliment.UniGetUI 2>&1
-        if ($checkOutput -match "MartiCliment.UniGetUI") {
-            Write-Host "UniGet UI is already installed" -ForegroundColor Green
-        } else {
-            # Try to install with detailed error capture
-            Write-Host "Installing UniGet UI..." -ForegroundColor Yellow
-            if (-not (Install-WithWinget -PackageId "MartiCliment.UniGetUI" -Source "winget")) {
-                if (-not (Handle-Error "Failed to install UniGet UI" "UniGet UI Installation" $Error[0])) {
-                    Exit-Script
-                    return
-            }
-        }
-
-        Write-Host "`nPlease:" -ForegroundColor Yellow
-        Write-Host "1. Launch UniGet UI" -ForegroundColor Yellow
-        Write-Host "2. Accept dependencies" -ForegroundColor Yellow
-        Write-Host "3. Load your previous settings" -ForegroundColor Yellow
-        Write-Host "4. Reinstall your previous working state" -ForegroundColor Yellow
-        
-        if (Get-UserConfirmation "Did you successfully set up UniGet UI and restore your settings?") {
-            Set-StageFlag "uniget-setup"
-            Write-Status "UniGet UI setup" -Status "Completed" -Color "Green"
-        } else {
-            if (-not (Handle-Error "UniGet UI setup was not completed successfully" "UniGet UI Setup")) {
-                Exit-Script
-                return
-                }
-            }
-        }
-    }
-    catch {
-        $errorDetail = $_.Exception.Message
-        $stackTrace = $_.ScriptStackTrace
-        if (-not (Handle-Error "Failed to install UniGet UI with error: $errorDetail`nStack trace: $stackTrace" "UniGet UI Installation" $_)) {
-            Write-Host "`nYou can try installing UniGet UI manually using:" -ForegroundColor Yellow
-            Write-Host "winget install --exact --id MartiCliment.UniGetUI --source winget" -ForegroundColor Cyan
-            Exit-Script
-            return
-        }
-    }
-} else {
-    Write-Status "UniGet UI" -Status "Already configured" -Color "Green"
-}
-
-# 10. OpenSSH Setup
-Write-Status "Setting up OpenSSH..." -Status "Starting" -Color "Yellow"
-if (-not (Test-Command "ssh")) {
-    # Install OpenSSH Client
-    if (-not (Invoke-ExternalCommand -Command 'Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0' `
-            -Description "Installing OpenSSH Client")) {
-        Handle-Error "Failed to install OpenSSH Client" "OpenSSH Client Installation"
-    }
-    
-    # Configure SSH Agent service
-    if (-not (Invoke-ExternalCommand -Command 'Set-Service -Name ssh-agent -StartupType Automatic' `
-            -Description "Configuring SSH Agent")) {
-        Handle-Error "Failed to configure SSH Agent" "SSH Agent Configuration"
-    }
-    
-    if (-not (Invoke-ExternalCommand -Command 'Start-Service ssh-agent' `
-            -Description "Starting SSH Agent")) {
-        Handle-Error "Failed to start SSH Agent" "SSH Agent Starting"
-    }
-    
-    Write-Status "OpenSSH setup" -Status "Completed" -Color "Green"
-} else {
-    Write-Status "OpenSSH" -Status "Already installed" -Color "Green"
-}
-
-# 11. KeePassXC Setup
-if (-not (Test-StageFlag "keepassxc-setup")) {
-    Write-Status "Installing KeePassXC..." -Status "Starting" -Color "Yellow"
-    
-    try {
-        # First check if already installed
-        $checkOutput = winget list --id KeePassXCTeam.KeePassXC 2>&1
-        if ($checkOutput -match "KeePassXCTeam.KeePassXC") {
-            Write-Host "KeePassXC is already installed" -ForegroundColor Green
-        } else {
-            # Try to install with detailed error capture
-            Write-Host "Installing KeePassXC..." -ForegroundColor Yellow
-            if (-not (Install-WithWinget -PackageId "KeePassXCTeam.KeePassXC")) {
-                if (-not (Handle-Error "Failed to install KeePassXC" "KeePassXC Installation" $Error[0])) {
-                    Exit-Script
-                    return
-            }
-        }
-
-        Write-Host "`nPlease configure KeePassXC:" -ForegroundColor Yellow
-        Write-Host "1. Enable SSH Agent integration" -ForegroundColor Yellow
-        Write-Host "2. Allow browser authentication" -ForegroundColor Yellow
-        Write-Host "3. Test SSH key integration" -ForegroundColor Yellow
-        Write-Host "4. Test browser integration" -ForegroundColor Yellow
-        
-        if (Get-UserConfirmation "Did you successfully configure KeePassXC?") {
-            Set-StageFlag "keepassxc-setup"
-            Write-Status "KeePassXC setup" -Status "Completed" -Color "Green"
-        } else {
-            if (-not (Handle-Error "KeePassXC setup was not completed successfully" "KeePassXC Setup")) {
-                Exit-Script
-                return
-                }
-            }
-        }
-    }
-    catch {
-        $errorDetail = $_.Exception.Message
-        $stackTrace = $_.ScriptStackTrace
-        if (-not (Handle-Error "Failed to install KeePassXC with error: $errorDetail`nStack trace: $stackTrace" "KeePassXC Installation" $_)) {
-            Write-Host "`nYou can try installing KeePassXC manually using:" -ForegroundColor Yellow
-            Write-Host "winget install --exact --id KeePassXCTeam.KeePassXC" -ForegroundColor Cyan
-            Exit-Script
-            return
-        }
-    }
-} else {
-    Write-Status "KeePassXC" -Status "Already configured" -Color "Green"
-}
-
-# 12. GPG Setup
-if (-not (Test-StageFlag "gpg-setup")) {
-    Write-Status "Installing GnuPG..." -Status "Starting" -Color "Yellow"
-    
-    # Install GnuPG
-    if (-not (Install-WithWinget -PackageId "GnuPG.GnuPG")) {
-        if (-not (Handle-Error "Failed to install GnuPG" "GnuPG Installation" $Error[0])) {
-            Exit-Script
-            return
-        }
-    }
-    
-    # Reload PATH after GPG installation
-    Reload-Path
-    
-    # Configure Git to use GPG
-    if (-not (Invoke-ExternalCommand -Command 'git config --global gpg.program "C:\Program Files (x86)\GnuPG\bin\gpg.exe"' `
-            -Description "Configuring Git GPG")) {
-        if (-not (Handle-Error "Failed to configure Git GPG" "Git GPG Configuration")) {
-            Exit-Script
-            return
-        }
-    }
-    
-    Write-Host "`nPlease complete GPG setup:" -ForegroundColor Yellow
-    Write-Host "1. Retrieve your private key (private.asc) from your password manager" -ForegroundColor Yellow
-    Write-Host "2. Import your key using:" -ForegroundColor Yellow
-    Write-Host "   gpg --import private.asc" -ForegroundColor Cyan
-    Write-Host "3. Verify the key was imported using:" -ForegroundColor Yellow
-    Write-Host "   gpg --list-secret-keys" -ForegroundColor Cyan
-    
-    if (Get-UserConfirmation "Did you successfully import your GPG key?") {
-        Set-StageFlag "gpg-setup"
-        Write-Status "GPG setup" -Status "Completed" -Color "Green"
-    } else {
-        if (-not (Handle-Error "GPG setup was not completed successfully" "GPG Setup")) {
-            Exit-Script
-            return
-        }
-    }
-} else {
-    Write-Status "GPG" -Status "Already configured" -Color "Green"
-}
-
-# 13. Work Tools Setup
-if (-not (Test-StageFlag "work-tools-setup")) {
-    Write-Status "Setting up work tools..." -Status "Starting" -Color "Yellow"
-    
-    # Install FortiClient VPN
-    Write-Host "`nPlease:" -ForegroundColor Yellow
-    Write-Host "1. Visit https://www.fortinet.com/support/product-downloads" -ForegroundColor Yellow
-    Write-Host "2. Download FortiClient VPN" -ForegroundColor Yellow
-    Write-Host "3. Install FortiClient VPN" -ForegroundColor Yellow
-    Write-Host "4. Disable 'Launch on Startup' in settings" -ForegroundColor Yellow
-    
-    if (-not (Get-UserConfirmation "Did you install and configure FortiClient VPN?")) {
-        Handle-Error "FortiClient VPN setup was not completed" "FortiClient VPN Setup"
-    }
-    
-    # Install Avaya Workplace
-    Write-Host "`nPlease:" -ForegroundColor Yellow
-    Write-Host "1. Download Avaya Workplace" -ForegroundColor Yellow
-    Write-Host "2. Install Avaya Workplace" -ForegroundColor Yellow
-    Write-Host "3. Disable 'Launch on Startup' in settings" -ForegroundColor Yellow
-    
-    if (-not (Get-UserConfirmation "Did you install and configure Avaya Workplace?")) {
-        Handle-Error "Avaya Workplace setup was not completed" "Avaya Workplace Setup"
-    }
-    
-    Set-StageFlag "work-tools-setup"
-    Write-Status "Work tools setup" -Status "Completed" -Color "Green"
-} else {
-    Write-Status "Work tools" -Status "Already configured" -Color "Green"
-}
-
-# 14. Edge Configuration
-if (-not (Test-StageFlag "edge-config")) {
-    Write-Status "Configuring Microsoft Edge..." -Status "Starting" -Color "Yellow"
-    
-    Write-Host "`nPlease configure Edge:" -ForegroundColor Yellow
-    Write-Host "1. Sign in with your Outlook account" -ForegroundColor Yellow
-    Write-Host "2. Sign in with your WorkM account" -ForegroundColor Yellow
-    Write-Host "3. Verify sync is working" -ForegroundColor Yellow
-    Write-Host "4. Install necessary extensions" -ForegroundColor Yellow
-    Write-Host "5. Configure your preferred settings" -ForegroundColor Yellow
-    
-    if (Get-UserConfirmation "Did you successfully configure Edge with both accounts?") {
-        Set-StageFlag "edge-config"
-        Write-Status "Edge configuration" -Status "Completed" -Color "Green"
-    } else {
-        Handle-Error "Edge configuration was not completed successfully" "Edge Configuration"
-    }
-} else {
-    Write-Status "Edge configuration" -Status "Already configured" -Color "Green"
-}
-
-# 15. Opener Setup
-if (-not (Test-StageFlag "opener-setup")) {
-    Write-Status "Setting up Neovim opener..." -Status "Starting" -Color "Yellow"
-    
-    # Add scripts to PATH
-    $scriptsPath = Join-Path $PSScriptRoot "scripts"
-    if (-not (Test-Path $scriptsPath)) {
-        Write-Host "Creating scripts directory..." -ForegroundColor Yellow
-        New-Item -ItemType Directory -Path $scriptsPath -Force | Out-Null
-    }
-
-    # Verify nvim-wezterm.bat exists
-    $nvimWeztermPath = Join-Path $scriptsPath "nvim-wezterm.bat"
-    if (-not (Test-Path $nvimWeztermPath)) {
-        Write-Warning "nvim-wezterm.bat not found at: $nvimWeztermPath"
-        Write-Host "Please ensure the file exists before continuing." -ForegroundColor Yellow
-        if (-not (Handle-Error "Required file nvim-wezterm.bat is missing" "Opener Setup")) {
-            Exit-Script
-            return
-        }
-    }
-    
-    # Add scripts to PATH
-    if (-not (Invoke-ExternalCommand -Command "Set-Env -Name 'PATH' -Value '$scriptsPath' -Scope 'Machine' -Verbose" `
-            -Description "Adding scripts to PATH")) {
-        if (-not (Handle-Error "Failed to add scripts to PATH" "Scripts to PATH")) {
-            Exit-Script
-            return
-        }
-    }
-    
-    # Set Neovim as default editor
-    if (-not (Invoke-ExternalCommand -Command "[System.Environment]::SetEnvironmentVariable('EDITOR', 'nvim', [System.EnvironmentVariableTarget]::Machine)" `
-            -Description "Setting Neovim as default editor")) {
-        if (-not (Handle-Error "Failed to set Neovim as default editor" "Neovim as default editor")) {
-            Exit-Script
-            return
-        }
-    }
-    
-    # Add context menu entries
-    if (-not (Add-NeovimContextMenu -Verbose)) {
-        if (-not (Handle-Error "Failed to add context menu entries. Please check if nvim-wezterm.bat exists in the scripts directory." "Context menu entries")) {
-            Exit-Script
-            return
-        }
-    }
-    
-    # Set file associations
-    if (-not (Set-FileAssociation -FileExtensions @("txt", "md", "json", "js", "py", "lua", "vim", "sh", "bat", "ps1", "config", "yml", "yaml", "xml", "ini", "conf", "log") -Verbose)) {
-        if (-not (Handle-Error "Failed to set file associations" "File associations")) {
-            Exit-Script
-            return
-        }
-    }
-    
-    # Reload PATH to ensure changes are available
-    Reload-Path
-    
-    Set-StageFlag "opener-setup"
-    Write-Status "Opener setup" -Status "Completed" -Color "Green"
-} else {
-    Write-Status "Opener" -Status "Already configured" -Color "Green"
-}
-
-# 16. ChatGPT Setup
-if (-not (Test-StageFlag "chatgpt-setup")) {
-    Write-Status "Setting up ChatGPT..." -Status "Starting" -Color "Yellow"
-    
-    Write-Host "`nPlease setup ChatGPT:" -ForegroundColor Yellow
-    Write-Host "1. Download ChatGPT from the Microsoft Store" -ForegroundColor Yellow
-    Write-Host "2. Launch ChatGPT" -ForegroundColor Yellow
-    Write-Host "3. Sign in to your OpenAI account" -ForegroundColor Yellow
-    Write-Host "4. Configure your preferred settings" -ForegroundColor Yellow
-    
-    if (Get-UserConfirmation "Did you successfully set up ChatGPT?") {
-        Set-StageFlag "chatgpt-setup"
-        Write-Status "ChatGPT setup" -Status "Completed" -Color "Green"
-    } else {
-        if (-not (Handle-Error "ChatGPT setup was not completed" "ChatGPT Setup")) {
-            Exit-Script
-            return
-        }
-    }
-} else {
-    Write-Status "ChatGPT" -Status "Already configured" -Color "Green"
-}
-
-# 17. Todoist Setup
-if (-not (Test-StageFlag "todoist-setup")) {
-    Write-Status "Installing Todoist..." -Status "Starting" -Color "Yellow"
-    
-    # Install Todoist
-    if (-not (Install-WithWinget -PackageId "Doist.Todoist")) {
-        if (-not (Handle-Error "Failed to install Todoist" "Todoist Installation" $Error[0])) {
-            Exit-Script
-            return
-        }
-    }
-    
-    Write-Host "`nPlease configure Todoist:" -ForegroundColor Yellow
-    Write-Host "1. Launch Todoist and sign in" -ForegroundColor Yellow
-    Write-Host "2. Bind Alt + T and Alt + Shift + T for quick actions" -ForegroundColor Yellow
-    Write-Host "3. Enable 'Start on Startup'" -ForegroundColor Yellow
-    Write-Host "4. Enable 'Run in Background'" -ForegroundColor Yellow
-    
-    if (Get-UserConfirmation "Did you successfully configure Todoist?") {
-        Set-StageFlag "todoist-setup"
-        Write-Status "Todoist setup" -Status "Completed" -Color "Green"
-    } else {
-        Handle-Error "Todoist setup was not completed successfully" "Todoist Setup"
-    }
-} else {
-    Write-Status "Todoist" -Status "Already configured" -Color "Green"
-}
-
-# 18. PowerToys Setup
-if (-not (Test-StageFlag "powertoys-setup")) {
-    Write-Status "Installing PowerToys..." -Status "Starting" -Color "Yellow"
-    
-    # Install PowerToys
-    if (-not (Install-WithWinget -PackageId "Microsoft.PowerToys")) {
-        if (-not (Handle-Error "Failed to install PowerToys" "PowerToys Installation" $Error[0])) {
-            Exit-Script
-            return
-        }
-    }
-    
-    # Reload PATH after PowerToys installation
-    Reload-Path
-    
-    Write-Host "`nPlease configure PowerToys:" -ForegroundColor Yellow
-    Write-Host "1. Launch PowerToys" -ForegroundColor Yellow
-    Write-Host "2. Configure FancyZones for window management" -ForegroundColor Yellow
-    Write-Host "3. Set up PowerToys Run shortcuts" -ForegroundColor Yellow
-    Write-Host "4. Configure any other modules you need" -ForegroundColor Yellow
-    Write-Host "5. Enable 'Run at startup'" -ForegroundColor Yellow
-    
-    if (Get-UserConfirmation "Did you successfully configure PowerToys?") {
-        Set-StageFlag "powertoys-setup"
-        Write-Status "PowerToys setup" -Status "Completed" -Color "Green"
-    } else {
-        Handle-Error "PowerToys setup was not completed successfully" "PowerToys Setup"
-    }
-} else {
-    Write-Status "PowerToys" -Status "Already configured" -Color "Green"
-}
-
-# 19. Personal Repositories Setup
+# 6. Personal Repositories Setup
 if (-not (Test-StageFlag "personal-repos-setup")) {
-    Write-Status "Setting up personal repositories..." -Status "Starting" -Color "Yellow"
-    
-    # Create parent directories if needed
-    $repoParentPath = "$env:USERPROFILE\repo"
-    if (-not (Test-Path $repoParentPath)) {
-        New-Item -ItemType Directory -Path $repoParentPath -Force | Out-Null
-        Write-Status "Created repositories directory" -Status "Done" -Color "Green"
-    }
-    
-    # Setup Neovim config
-    $nvimConfigPath = "$env:LOCALAPPDATA\nvim"
-    $nvimConfigParent = Split-Path $nvimConfigPath -Parent
-    if (-not (Test-Path $nvimConfigParent)) {
-        New-Item -ItemType Directory -Path $nvimConfigParent -Force | Out-Null
-        Write-Status "Created Neovim config parent directory" -Status "Done" -Color "Green"
-    }
-    
-    if (-not (Test-Path $nvimConfigPath)) {
-        if (-not (Invoke-ExternalCommand -Command "git clone https://github.com/PaysanCorrezien/config.nvim.git $nvimConfigPath" `
-                -Description "Cloning Neovim config")) {
-            if (-not (Handle-Error "Failed to clone Neovim config" "Neovim config cloning")) {
-                Exit-Script
-                return
-            }
-        }
-        Write-Status "Neovim config" -Status "Cloned" -Color "Green"
-    } else {
-        Write-Status "Neovim config" -Status "Already exists" -Color "Green"
-    }
-    
-    # Setup WezTerm config
-    $weztermConfigPath = "$env:USERPROFILE\repo\config.wezterm"
-    if (-not (Test-Path $weztermConfigPath)) {
-        if (-not (Invoke-ExternalCommand -Command "git clone https://github.com/PaysanCorrezien/config.wezterm $weztermConfigPath" `
-                -Description "Cloning WezTerm config")) {
-            if (-not (Handle-Error "Failed to clone WezTerm config" "WezTerm config cloning")) {
-                Exit-Script
-                return
-            }
-        }
-        Write-Status "WezTerm config" -Status "Cloned" -Color "Green"
-    } else {
-        Write-Status "WezTerm config" -Status "Already exists" -Color "Green"
-    }
-    
-    # Setup Chezmoi
-    if (-not (Test-Command "chezmoi")) {
-        if (-not (Install-WithWinget -PackageId "twpayne.chezmoi")) {
-            if (-not (Handle-Error "Failed to install Chezmoi" "Chezmoi Installation" $Error[0])) {
-                Exit-Script
-                return
-            }
-        }
-        
-        # Reload PATH to ensure chezmoi is available
-        Reload-Path
-    }
-    
-    Write-Host "`nInitializing Chezmoi with dotfiles:" -ForegroundColor Yellow
-    
-    # Set safe directory
-    if (-not (Invoke-ExternalCommand -Command 'git config --global --add safe.directory C:/Users/admin/.local/share/chezmoi' `
-            -Description "Setting safe directory for chezmoi")) {
-        Handle-Error "Failed to set safe directory" "Chezmoi safe directory configuration"
-    }
-    
-    # Clear existing chezmoi directory if it exists
-    $chezmoiDir = "C:/Users/admin/.local/share/chezmoi"
-    if (Test-Path $chezmoiDir) {
-        if (-not (Invoke-ExternalCommand -Command "Remove-Item -Recurse -Force $chezmoiDir" `
-                -Description "Clearing existing chezmoi directory")) {
-            Handle-Error "Failed to clear existing chezmoi directory" "Chezmoi directory cleanup"
+    if (-not (& $installStages['Install-PersonalRepositories'])) {
+        if (-not (Handle-Error "Failed to set up personal repositories" "Personal Repositories Setup")) {
+            Exit-Script
+            return
         }
     }
-    
-    # Initialize and apply chezmoi
-    if (-not (Invoke-ExternalCommand -Command "chezmoi init https://github.com/PaysanCorrezien/chezmoi-win --apply" `
-            -Description "Initializing and applying Chezmoi configuration")) {
-        Handle-Error "Failed to initialize and apply Chezmoi" "Chezmoi initialization"
-    }
-    
-    Write-Host "`nChezmoi configuration has been applied." -ForegroundColor Green
-    
-    Write-Host "`nPlease review Chezmoi changes:" -ForegroundColor Yellow
-    Write-Host "1. Review proposed changes with: chezmoi diff" -ForegroundColor Yellow
-    Write-Host "2. Apply changes with: chezmoi apply -v" -ForegroundColor Yellow
-    
-    if (Get-UserConfirmation "Did you successfully review and apply Chezmoi changes?") {
-        Set-StageFlag "personal-repos-setup"
-        Write-Status "Personal repositories setup" -Status "Completed" -Color "Green"
-    } else {
-        Handle-Error "Personal repositories setup was not completed successfully" "Personal repositories setup"
-    }
-} else {
-    Write-Status "Personal repositories" -Status "Already configured" -Color "Green"
 }
 
-# 19.5 CLI Utilities Installation
+# 7. CLI Utilities Installation
 if (-not (Test-StageFlag "cli-utils-setup")) {
-    Write-Status "Installing CLI utilities..." -Status "Starting" -Color "Yellow"
-    
-    # Install Winget packages
-    $cliUtils = @(
-        @{Id = "rsteube.Carapace"; Description = "Command completion"},
-        @{Id = "Slackadays.Clipboard"; Description = "Clipboard manager"},
-        @{Id = "Gitleaks.Gitleaks"; Description = "Git secrets scanner"},
-        @{Id = "lsd-rs.lsd"; Description = "LSDeluxe"},
-        @{Id = "Starship.Starship"; Description = "Prompt"},
-        @{Id = "XAMPPRocky.tokei"; Description = "Code metrics"},
-        @{Id = "Gitleaks.Gitleaks"; Description = "Git secrets scanner"}
-    )
-    
-    foreach ($util in $cliUtils) {
-        if (-not (Install-WithWinget -PackageId $util.Id)) {
-            if (-not (Handle-Error "Failed to install $($util.Description)" "$($util.Id) Installation" $Error[0])) {
-                Exit-Script
-                return
-            }
+    if (-not (& $installStages['Install-CLIUtilities'])) {
+        if (-not (Handle-Error "Failed to install CLI utilities" "CLI Utilities Installation")) {
+            Exit-Script
+            return
         }
     }
-    
-    # Install Atuin via Cargo
-    Write-Host "`nInstalling Atuin via Cargo..." -ForegroundColor Yellow
-    if (-not (Invoke-ExternalCommand -Command "cargo install atuin" `
-            -Description "Installing Atuin")) {
-        Handle-Error "Failed to install Atuin" "Atuin Installation"
-    }
-    
-    # Install BusyGit via pip
-    Write-Host "`nInstalling BusyGit..." -ForegroundColor Yellow
-    if (-not (Invoke-ExternalCommand -Command "python -m pip install git+https://github.com/PaysanCorrezien/BusyGit.git" `
-            -Description "Installing BusyGit")) {
-        Handle-Error "Failed to install BusyGit" "BusyGit Installation"
-    }
-    
-    # Reload PATH to ensure new utilities are available
-    Reload-Path
-    
-    Set-StageFlag "cli-utils-setup"
-    Write-Status "CLI utilities installation" -Status "Completed" -Color "Green"
-} else {
-    Write-Status "CLI utilities" -Status "Already installed" -Color "Green"
 }
 
-# 20. Final System Configurations
+# 8. Application Installations
+if (-not (Test-StageFlag "nextcloud-setup")) {
+    if (-not (& $appInstallations['Install-Nextcloud'])) {
+        Handle-Error "Failed to install Nextcloud" "Nextcloud Installation"
+    }
+    Set-StageFlag "nextcloud-setup"
+}
+
+if (-not (Test-StageFlag "keepassxc-setup")) {
+    if (-not (& $appInstallations['Install-KeePassXC'])) {
+        Handle-Error "Failed to install KeePassXC" "KeePassXC Installation"
+    }
+    Set-StageFlag "keepassxc-setup"
+}
+
+if (-not (Test-StageFlag "gpg-setup")) {
+    if (-not (& $appInstallations['Install-GnuPG'])) {
+        Handle-Error "Failed to install GnuPG" "GnuPG Installation"
+    }
+    Set-StageFlag "gpg-setup"
+}
+
+if (-not (Test-StageFlag "edge-config")) {
+    if (-not (& $edgeConfig['Install-EdgeConfiguration'])) {
+        Handle-Error "Failed to configure Edge" "Edge Configuration"
+    }
+    Set-StageFlag "edge-config"
+}
+
+if (-not (Test-StageFlag "powertoys-setup")) {
+    if (-not (& $appInstallations['Install-PowerToys'])) {
+        Handle-Error "Failed to install PowerToys" "PowerToys Installation"
+    }
+    Set-StageFlag "powertoys-setup"
+}
+
+# 9. Work Tools Setup
+if (-not (Test-StageFlag "work-tools-setup")) {
+    if (-not (& $workSetup['Install-WorkTools'])) {
+        Handle-Error "Failed to set up work tools" "Work Tools Setup"
+    }
+    Set-StageFlag "work-tools-setup"
+}
+
+if (-not (Test-StageFlag "uniget-setup")) {
+    if (-not (& $workSetup['Install-UniGetUI'])) {
+        Handle-Error "Failed to install UniGet UI" "UniGet UI Installation"
+    }
+    Set-StageFlag "uniget-setup"
+}
+
+if (-not (Test-StageFlag "chatgpt-setup")) {
+    if (-not (& $workSetup['Install-ChatGPT'])) {
+        Handle-Error "Failed to set up ChatGPT" "ChatGPT Setup"
+    }
+    Set-StageFlag "chatgpt-setup"
+}
+
+if (-not (Test-StageFlag "todoist-setup")) {
+    if (-not (& $workSetup['Install-Todoist'])) {
+        Handle-Error "Failed to install Todoist" "Todoist Installation"
+    }
+    Set-StageFlag "todoist-setup"
+}
+
+# 10. Final System Configurations
 if (-not (Test-StageFlag "final-system-config")) {
-    Write-Status "Applying final system configurations..." -Status "Starting" -Color "Yellow"
-    
-    # Configure Git SSH command
-    if (-not (Invoke-ExternalCommand -Command 'git config --global core.sshCommand "C:/Windows/System32/OpenSSH/ssh.exe"' `
-            -Description "Configuring Git SSH command")) {
-        Handle-Error "Failed to configure Git SSH command" "Git SSH command configuration"
+    if (-not (& $systemConfig['Set-FinalSystemConfigurations'])) {
+        Handle-Error "Failed to apply final system configurations" "Final System Configuration"
     }
-    Write-Status "Git SSH configuration" -Status "Completed" -Color "Green"
-    
-    # Configure startup programs
-    Write-Host "`nConfiguring startup programs..." -ForegroundColor Yellow
-    $startupFolder = "C:\ProgramData\Microsoft\Windows\Start Menu\Programs"
-    $glazeWMPath = Join-Path $startupFolder "GlazeWM.lnk"
-    
-    if (Test-Path $glazeWMPath) {
-        Write-Host "Adding GlazeWM to startup programs..." -ForegroundColor Yellow
-        Copy-Item $glazeWMPath "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\" -Force
-        Write-Status "GlazeWM startup configuration" -Status "Completed" -Color "Green"
-    } else {
-        Write-Warning "GlazeWM shortcut not found at expected location: $glazeWMPath"
-    }
-    
-    # Prompt for WezTerm float version installation
-    Write-Host "`nWould you like to install the custom float version of WezTerm?" -ForegroundColor Yellow
-    if (Get-UserConfirmation "Install custom WezTerm float version?") {
-        $weztermFloatScript = Join-Path $PSScriptRoot "scripts\install-wezterm-float.ps1"
-        if (Test-Path $weztermFloatScript) {
-            if (-not (Invoke-ExternalCommand -Command "& '$weztermFloatScript'" `
-                    -Description "Installing WezTerm float version")) {
-                Handle-Error "Failed to install WezTerm float version" "WezTerm Installation"
-            }
-            Write-Status "WezTerm float version" -Status "Installed" -Color "Green"
-        } else {
-            Write-Warning "WezTerm float installation script not found at: $weztermFloatScript"
-        }
-    }
-    
-    # Rename computer
-    $currentName = $env:COMPUTERNAME
-    Write-Host "`nCurrent computer name: $currentName" -ForegroundColor Yellow
-    Write-Host "Would you like to rename your computer? If yes, provide a new name." -ForegroundColor Yellow
-    $newName = Read-Host "Enter new computer name (or press Enter to skip)"
-    
-    if ($newName -and ($newName -ne $currentName)) {
-        if (-not (Invoke-ExternalCommand -Command "Rename-Computer -NewName '$newName' -Force" `
-                -Description "Renaming computer")) {
-            Handle-Error "Failed to rename computer" "Computer renaming"
-        }
-        Write-Host "`nComputer has been renamed to '$newName'. A restart will be required for this change to take effect." -ForegroundColor Yellow
-    }
-    
     Set-StageFlag "final-system-config"
-    Write-Status "Final system configurations" -Status "Completed" -Color "Green"
-} else {
-    Write-Status "Final system configurations" -Status "Already configured" -Color "Green"
 }
 
-# 21. Update Configurations
-Write-Status "Updating configuration repositories..." -Status "Starting" -Color "Yellow"
-
-# Define repositories to update
-$configRepos = @(
-    @{
-        Path = Join-Path $env:USERPROFILE "repo\config.wezterm"
-        Description = "WezTerm Configuration"
-    },
-    @{
-        Path = Join-Path $env:USERPROFILE "repo\pythonautomation"
-        Description = "Python Automation Scripts"
-    },
-    @{
-        Path = Join-Path $env:USERPROFILE ".local\share\chezmoi"
-        Description = "Chezmoi Dotfiles"
-    },
-    @{
-        Path = Join-Path $env:LOCALAPPDATA "nvim"
-        Description = "Neovim Configuration"
-    }
-)
-
-# Update each repository
-foreach ($repo in $configRepos) {
-    if (-not (Update-GitRepository -RepoPath $repo.Path -Description $repo.Description)) {
-        Write-Warning "Failed to update $($repo.Description)"
-    }
+# 11. Update Configurations
+if (-not (& $systemConfig['Update-ConfigurationRepositories'])) {
+    Handle-Error "Failed to update configuration repositories" "Configuration Updates"
 }
-
-Write-Status "Configuration updates" -Status "Completed" -Color "Green"
 
 Write-Host "`nInstallation completed successfully!`n" -ForegroundColor Green
 Pause-Script 
