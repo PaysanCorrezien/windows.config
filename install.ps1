@@ -5,7 +5,15 @@ Set-StrictMode -Version 3.0
 # Import required modules
 $modulePath = Join-Path $PSScriptRoot "module"
 
-# Create a new scope for the imports to avoid namespace pollution
+# Initialize logging
+$logging = . "$modulePath\logging.ps1"
+$Logger = $logging.Logger
+$Logger::Initialize($null)  # Use default log file location
+
+$Logger::Section("Windows Configuration Setup")
+$Logger::Info("Starting installation process...")
+
+# Import module functions into current scope
 $script:utils = . "$modulePath\utils.ps1"
 $script:styles = . "$modulePath\styles.ps1"
 $script:neovimMenu = . "$modulePath\setup-neovim-menu-entry.ps1"
@@ -17,10 +25,9 @@ $script:packageManagement = . "$modulePath\package-management.ps1"
 $script:appInstallations = . "$modulePath\app-installations.ps1"
 $script:workSetup = . "$modulePath\work-setup.ps1"
 $script:edgeConfig = . "$modulePath\edge-config.ps1"
+$script:gitSync = . "$modulePath\git-sync.ps1"
 
-# Import functions into current scope for easier access
-${function:Write-Status} = $utils['Write-Status']
-${function:Write-Log} = $utils['Write-Log']
+# Import common functions into current scope
 ${function:Set-StageFlag} = $utils['Set-StageFlag']
 ${function:Test-StageFlag} = $utils['Test-StageFlag']
 ${function:Invoke-ExternalCommand} = $utils['Invoke-ExternalCommand']
@@ -33,162 +40,379 @@ ${function:Handle-Error} = $utils['Handle-Error']
 ${function:Pause-Script} = $utils['Pause-Script']
 ${function:Exit-Script} = $utils['Exit-Script']
 
-# Main installation process
-Write-Host "`nStarting installation process...`n" -ForegroundColor Cyan
-
 # 1. Initial Windows Setup - Windows Utility
-if (-not (Test-StageFlag "windows-utility")) {
-    if (-not (& $installStages['Install-WindowsUtility'])) {
-        Exit-Script
-        return
-    }
+$Logger::StartTask("Windows Utility Setup")
+if (-not (Test-StageFlag "windows-utility"))
+{
+  if (-not (& $installStages['Install-WindowsUtility']))
+  {
+    $Logger::Error("Windows Utility installation failed", $null)
+    Exit-Script
+    return
+  }
+  if (Get-UserConfirmation "Windows Utility setup completed successfully. Set flag to skip on next run?")
+  {
+    Set-StageFlag "windows-utility"
+  }
 }
+$Logger::EndTask($true)
 
 # 2. Initial Windows Setup - Activation
-if (-not (Test-StageFlag "windows-activation")) {
-    if (-not (& $installStages['Install-WindowsActivation'])) {
-        Exit-Script
-        return
-    }
+$Logger::StartTask("Windows Activation")
+if (-not (Test-StageFlag "windows-activation"))
+{
+  if (-not (& $installStages['Install-WindowsActivation']))
+  {
+    $Logger::Error("Windows Activation failed", $null)
+    Exit-Script
+    return
+  }
+  if (Get-UserConfirmation "Windows Activation completed successfully. Set flag to skip on next run?")
+  {
+    Set-StageFlag "windows-activation"
+  }
 }
+$Logger::EndTask($true)
 
 # 3. Keyboard Layout
-Write-Status "Checking keyboard layout..." -Status "Checking" -Color "Yellow"
-if (-not (Test-KeyboardLayout)) {
-    Write-Host "Installing custom keyboard layout..." -ForegroundColor Yellow
-    Set-CustomKeyboardLayout
-    if (-not $?) {
-        if (-not (Handle-Error "Failed to install keyboard layout" "Keyboard Layout Installation")) {
-            Exit-Script
-            return
-        }
-    } else {
-        Write-Status "Keyboard layout installation" -Status "Installed" -Color "Green"
+$Logger::StartTask("Keyboard Layout Setup")
+if (-not (Test-KeyboardLayout))
+{
+  $Logger::Info("Installing custom keyboard layout...")
+  Set-CustomKeyboardLayout
+  if (-not $?)
+  {
+    if (-not (Handle-Error "Failed to install keyboard layout" "Keyboard Layout Installation"))
+    {
+      $Logger::Error("Keyboard layout installation failed", $null)
+      Exit-Script
+      return
     }
-} else {
-    Write-Status "Keyboard layout" -Status "Already installed" -Color "Green"
+  }
+  $Logger::Success("Keyboard layout installed successfully")
+  if (Get-UserConfirmation "Keyboard layout setup completed successfully. Set flag to skip on next run?")
+  {
+    Set-StageFlag "keyboard-layout"
+  }
+} else
+{
+  $Logger::Info("Keyboard layout already installed")
 }
+$Logger::EndTask($true)
 
 # 4. Style Settings
-if (-not (Test-StageFlag "style-settings")) {
-    Write-Status "Applying style settings..." -Status "In Progress" -Color "Yellow"
-    Set-WindowsStyle -HideTaskbar -HideDesktopIcons -EnableDarkMode -AccentColor 'Rose'
-    if (-not $?) {
-        if (-not (Handle-Error "Failed to apply style settings" "Style Settings")) {
-            Exit-Script
-            return
-        }
-    } else {
-        Set-StageFlag "style-settings"
-        Write-Status "Style settings" -Status "Applied" -Color "Green"
+$Logger::StartTask("Style Configuration")
+if (-not (Test-StageFlag "style-settings"))
+{
+  $Logger::Info("Applying style settings...")
+  Set-WindowsStyle -HideTaskbar -HideDesktopIcons -EnableDarkMode -AccentColor 'Rose'
+  if (-not $?)
+  {
+    if (-not (Handle-Error "Failed to apply style settings" "Style Settings"))
+    {
+      $Logger::Error("Style settings application failed", $null)
+      Exit-Script
+      return
     }
+  }
+  if (Get-UserConfirmation "Style settings completed successfully. Set flag to skip on next run?")
+  {
+    Set-StageFlag "style-settings"
+  }
 }
+$Logger::EndTask($true)
 
 # 5. OpenSSH Setup
-if (-not (& $systemConfig['Set-OpenSSH'])) {
-    if (-not (Handle-Error "Failed to set up OpenSSH" "OpenSSH Setup")) {
-        Exit-Script
-        return
+$Logger::StartTask("OpenSSH Configuration")
+if (-not (Test-StageFlag "openssh-setup"))
+{
+  if (-not (& $systemConfig['Set-OpenSSH']))
+  {
+    if (-not (Handle-Error "Failed to set up OpenSSH" "OpenSSH Setup"))
+    {
+      $Logger::Error("OpenSSH setup failed", $null)
+      Exit-Script
+      return
     }
+  }
+  if (Get-UserConfirmation "OpenSSH setup completed successfully. Set flag to skip on next run?")
+  {
+    Set-StageFlag "openssh-setup"
+  }
 }
+$Logger::EndTask($true)
 
 # 6. Personal Repositories Setup
-if (-not (Test-StageFlag "personal-repos-setup")) {
-    if (-not (& $installStages['Install-PersonalRepositories'])) {
-        if (-not (Handle-Error "Failed to set up personal repositories" "Personal Repositories Setup")) {
-            Exit-Script
-            return
-        }
+$Logger::StartTask("Personal Repositories Setup")
+if (-not (Test-StageFlag "personal-repos-setup"))
+{
+  if (-not (& $installStages['Install-PersonalRepositories']))
+  {
+    if (-not (Handle-Error "Failed to set up personal repositories" "Personal Repositories Setup"))
+    {
+      $Logger::Error("Personal repositories setup failed", $null)
+      Exit-Script
+      return
     }
+  }
+  if (Get-UserConfirmation "Personal repositories setup completed successfully. Set flag to skip on next run?")
+  {
+    Set-StageFlag "personal-repos-setup"
+  }
 }
+$Logger::EndTask($true)
 
 # 7. CLI Utilities Installation
-if (-not (Test-StageFlag "cli-utils-setup")) {
-    if (-not (& $installStages['Install-CLIUtilities'])) {
-        if (-not (Handle-Error "Failed to install CLI utilities" "CLI Utilities Installation")) {
-            Exit-Script
-            return
-        }
+$Logger::StartTask("CLI Utilities Installation")
+if (-not (Test-StageFlag "cli-utils-setup"))
+{
+  if (-not (& $installStages['Install-CLIUtilities']))
+  {
+    if (-not (Handle-Error "Failed to install CLI utilities" "CLI Utilities Installation"))
+    {
+      $Logger::Error("CLI utilities installation failed", $null)
+      Exit-Script
+      return
     }
+  }
+  if (Get-UserConfirmation "CLI utilities installation completed successfully. Set flag to skip on next run?")
+  {
+    Set-StageFlag "cli-utils-setup"
+  }
 }
+$Logger::EndTask($true)
 
 # 8. Application Installations
-if (-not (Test-StageFlag "nextcloud-setup")) {
-    if (-not (& $appInstallations['Install-Nextcloud'])) {
-        Handle-Error "Failed to install Nextcloud" "Nextcloud Installation"
-    }
-    Set-StageFlag "nextcloud-setup"
-}
+$Logger::Section("Application Installations")
 
-if (-not (Test-StageFlag "keepassxc-setup")) {
-    if (-not (& $appInstallations['Install-KeePassXC'])) {
-        Handle-Error "Failed to install KeePassXC" "KeePassXC Installation"
+# Nextcloud
+$Logger::StartTask("Nextcloud Installation")
+if (-not (Test-StageFlag "nextcloud-setup"))
+{
+  if (-not (& $appInstallations['Install-Nextcloud']))
+  {
+    $Logger::Error("Nextcloud installation failed", $null)
+    Handle-Error "Failed to install Nextcloud" "Nextcloud Installation"
+  } else 
+  {
+    if (Get-UserConfirmation "Nextcloud installation completed successfully. Set flag to skip on next run?")
+    {
+      Set-StageFlag "nextcloud-setup"
     }
-    Set-StageFlag "keepassxc-setup"
+  }
+} else
+{
+  $Logger::Info("Nextcloud already installed, skipping...")
 }
+$Logger::EndTask($true)
 
-if (-not (Test-StageFlag "gpg-setup")) {
-    if (-not (& $appInstallations['Install-GnuPG'])) {
-        Handle-Error "Failed to install GnuPG" "GnuPG Installation"
+# KeePassXC
+$Logger::StartTask("KeePassXC Installation")
+if (-not (Test-StageFlag "keepassxc-setup"))
+{
+  if (-not (& $appInstallations['Install-KeePassXC']))
+  {
+    $Logger::Error("KeePassXC installation failed", $null)
+    Handle-Error "Failed to install KeePassXC" "KeePassXC Installation"
+  } else
+  {
+    if (Get-UserConfirmation "KeePassXC installation completed successfully. Set flag to skip on next run?")
+    {
+      Set-StageFlag "keepassxc-setup"
     }
-    Set-StageFlag "gpg-setup"
+  }
+} else
+{
+  $Logger::Info("KeePassXC already installed, skipping...")
 }
+$Logger::EndTask($true)
 
-if (-not (Test-StageFlag "edge-config")) {
-    if (-not (& $edgeConfig['Install-EdgeConfiguration'])) {
-        Handle-Error "Failed to configure Edge" "Edge Configuration"
+# GnuPG
+$Logger::StartTask("GnuPG Installation")
+if (-not (Test-StageFlag "gpg-setup"))
+{
+  if (-not (& $appInstallations['Install-GnuPG']))
+  {
+    $Logger::Error("GnuPG installation failed", $null)
+    Handle-Error "Failed to install GnuPG" "GnuPG Installation"
+  } else
+  {
+    if (Get-UserConfirmation "GnuPG installation completed successfully. Set flag to skip on next run?")
+    {
+      Set-StageFlag "gpg-setup"
     }
-    Set-StageFlag "edge-config"
+  }
+} else
+{
+  $Logger::Info("GnuPG already installed, skipping...")
 }
+$Logger::EndTask($true)
 
-if (-not (Test-StageFlag "powertoys-setup")) {
-    if (-not (& $appInstallations['Install-PowerToys'])) {
-        Handle-Error "Failed to install PowerToys" "PowerToys Installation"
+# Edge Configuration
+$Logger::StartTask("Edge Configuration")
+if (-not (Test-StageFlag "edge-config"))
+{
+  if (-not (& $edgeConfig['Install-EdgeConfiguration']))
+  {
+    $Logger::Error("Edge configuration failed", $null)
+    Handle-Error "Failed to configure Edge" "Edge Configuration"
+  } else
+  {
+    if (Get-UserConfirmation "Edge configuration completed successfully. Set flag to skip on next run?")
+    {
+      Set-StageFlag "edge-config"
     }
-    Set-StageFlag "powertoys-setup"
+  }
+} else
+{
+  $Logger::Info("Edge already configured, skipping...")
 }
+$Logger::EndTask($true)
+
+# PowerToys
+$Logger::StartTask("PowerToys Installation")
+if (-not (Test-StageFlag "powertoys-setup"))
+{
+  if (-not (& $appInstallations['Install-PowerToys']))
+  {
+    $Logger::Error("PowerToys installation failed", $null)
+    Handle-Error "Failed to install PowerToys" "PowerToys Installation"
+  } else
+  {
+    if (Get-UserConfirmation "PowerToys installation completed successfully. Set flag to skip on next run?")
+    {
+      Set-StageFlag "powertoys-setup"
+    }
+  }
+} else
+{
+  $Logger::Info("PowerToys already installed, skipping...")
+}
+$Logger::EndTask($true)
 
 # 9. Work Tools Setup
-if (-not (Test-StageFlag "work-tools-setup")) {
-    if (-not (& $workSetup['Install-WorkTools'])) {
-        Handle-Error "Failed to set up work tools" "Work Tools Setup"
+$Logger::Section("Work Tools Setup")
+# Main Work Tools
+$Logger::StartTask("Work Tools Installation")
+if (-not (Test-StageFlag "work-tools-setup"))
+{
+  if (-not (& $workSetup['Install-WorkTools']))
+  {
+    $Logger::Error("Work tools setup failed", $null)
+    if (-not (Handle-Error "Failed to set up work tools" "Work Tools Setup"))
+    {
+      $Logger::EndTask($false)
+      Exit-Script
+      return $false
     }
+  } else
+  {
     Set-StageFlag "work-tools-setup"
+    $Logger::Success("Work tools setup completed successfully")
+    $Logger::EndTask($true)
+  }
+} else
+{
+  $Logger::Info("Work tools already installed, skipping...")
+  $Logger::EndTask($true)
 }
 
-if (-not (Test-StageFlag "uniget-setup")) {
-    if (-not (& $workSetup['Install-UniGetUI'])) {
-        Handle-Error "Failed to install UniGet UI" "UniGet UI Installation"
-    }
-    Set-StageFlag "uniget-setup"
-}
 
-if (-not (Test-StageFlag "chatgpt-setup")) {
-    if (-not (& $workSetup['Install-ChatGPT'])) {
-        Handle-Error "Failed to set up ChatGPT" "ChatGPT Setup"
+# UniGet UI
+$Logger::StartTask("UniGet UI Installation")
+if (-not (Test-StageFlag "uniget-setup"))
+{
+  if (-not (& $workSetup['Install-UniGetUI']))
+  {
+    $Logger::Error("UniGet UI installation failed", $null)
+    Handle-Error "Failed to install UniGet UI" "UniGet UI Installation"
+  } else
+  {
+    if (Get-UserConfirmation "UniGet UI installation completed successfully. Set flag to skip on next run?")
+    {
+      Set-StageFlag "uniget-setup"
     }
-    Set-StageFlag "chatgpt-setup"
+  }
+} else
+{
+  $Logger::Info("UniGet UI already installed, skipping...")
 }
+$Logger::EndTask($true)
 
-if (-not (Test-StageFlag "todoist-setup")) {
-    if (-not (& $workSetup['Install-Todoist'])) {
-        Handle-Error "Failed to install Todoist" "Todoist Installation"
+# ChatGPT
+$Logger::StartTask("ChatGPT Setup")
+if (-not (Test-StageFlag "chatgpt-setup"))
+{
+  if (-not (& $workSetup['Install-ChatGPT']))
+  {
+    $Logger::Error("ChatGPT setup failed", $null)
+    Handle-Error "Failed to set up ChatGPT" "ChatGPT Setup"
+  } else
+  {
+    if (Get-UserConfirmation "ChatGPT setup completed successfully. Set flag to skip on next run?")
+    {
+      Set-StageFlag "chatgpt-setup"
     }
-    Set-StageFlag "todoist-setup"
+  }
+} else
+{
+  $Logger::Info("ChatGPT already installed, skipping...")
 }
+$Logger::EndTask($true)
+
+# Todoist
+$Logger::StartTask("Todoist Installation")
+if (-not (Test-StageFlag "todoist-setup"))
+{
+  if (-not (& $workSetup['Install-Todoist']))
+  {
+    $Logger::Error("Todoist installation failed", $null)
+    Handle-Error "Failed to install Todoist" "Todoist Installation"
+  } else
+  {
+    if (Get-UserConfirmation "Todoist installation completed successfully. Set flag to skip on next run?")
+    {
+      Set-StageFlag "todoist-setup"
+    }
+  }
+} else
+{
+  $Logger::Info("Todoist already installed, skipping...")
+}
+$Logger::EndTask($true)
 
 # 10. Final System Configurations
-if (-not (Test-StageFlag "final-system-config")) {
-    if (-not (& $systemConfig['Set-FinalSystemConfigurations'])) {
-        Handle-Error "Failed to apply final system configurations" "Final System Configuration"
+$Logger::StartTask("Final System Configuration")
+if (-not (Test-StageFlag "final-system-config"))
+{
+  if (-not (& $systemConfig['Set-FinalSystemConfigurations']))
+  {
+    $Logger::Error("Final system configuration failed", $null)
+    Handle-Error "Failed to apply final system configurations" "Final System Configuration"
+  } else
+  {
+    if (Get-UserConfirmation "Final system configuration completed successfully. Set flag to skip on next run?")
+    {
+      Set-StageFlag "final-system-config"
     }
-    Set-StageFlag "final-system-config"
+  }
+} else
+{
+  $Logger::Info("Final system configuration already completed, skipping...")
 }
+$Logger::EndTask($true)
 
 # 11. Update Configurations
-if (-not (& $systemConfig['Update-ConfigurationRepositories'])) {
-    Handle-Error "Failed to update configuration repositories" "Configuration Updates"
+$Logger::StartTask("Configuration Updates")
+if (-not (& $gitSync['Update-ConfigurationRepositories']))
+{
+  $Logger::Error("Configuration repositories update failed", $null)
+  Handle-Error "Failed to update configuration repositories" "Configuration Updates"
 }
+$Logger::EndTask($true)
 
-Write-Host "`nInstallation completed successfully!`n" -ForegroundColor Green
-Pause-Script 
+$Logger::Section("Installation Complete")
+$Logger::Success("Windows configuration setup completed successfully!")
+$Logger::Info("Log file location: $($Logger::LogFile)")
+
+Pause-Script

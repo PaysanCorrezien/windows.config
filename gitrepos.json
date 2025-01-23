@@ -1,0 +1,32 @@
+[
+  {
+    "description": "WezTerm Configuration",
+    "path": "repo\\config.wezterm",
+    "url": "git@github.com:PaysanCorrezien/config.wezterm.git",
+    "required": true
+  },
+  {
+    "description": "Python Automation Scripts",
+    "path": "repo\\pythonautomation",
+    "url": "git@github.com:PaysanCorrezien/pythonautomation.git",
+    "required": false
+  },
+  {
+    "description": "Chezmoi Dotfiles",
+    "path": ".local\\share\\chezmoi",
+    "url": "git@github.com:PaysanCorrezien/dotfiles.git",
+    "required": true
+  },
+  {
+    "description": "Neovim Configuration",
+    "path": "AppData\\Local\\nvim",
+    "url": "git@github.com:PaysanCorrezien/nvim-config.git",
+    "required": true
+  },
+  {
+    "description": "Espanso Configuration",
+    "path": "AppData\\Roaming\\espanso",
+    "url": "git@github.com:PaysanCorrezien/espanso.git",
+    "required": false
+  }
+]
