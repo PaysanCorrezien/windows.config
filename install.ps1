@@ -50,10 +50,7 @@ if (-not (Test-StageFlag "windows-utility"))
     Exit-Script
     return
   }
-  if (Get-UserConfirmation "Windows Utility setup completed successfully. Set flag to skip on next run?")
-  {
-    Set-StageFlag "windows-utility"
-  }
+  Set-StageFlag "windows-utility"
 }
 $Logger::EndTask($true)
 
@@ -67,10 +64,7 @@ if (-not (Test-StageFlag "windows-activation"))
     Exit-Script
     return
   }
-  if (Get-UserConfirmation "Windows Activation completed successfully. Set flag to skip on next run?")
-  {
-    Set-StageFlag "windows-activation"
-  }
+  Set-StageFlag "windows-activation"
 }
 $Logger::EndTask($true)
 
@@ -90,10 +84,7 @@ if (-not (Test-KeyboardLayout))
     }
   }
   $Logger::Success("Keyboard layout installed successfully")
-  if (Get-UserConfirmation "Keyboard layout setup completed successfully. Set flag to skip on next run?")
-  {
-    Set-StageFlag "keyboard-layout"
-  }
+  Set-StageFlag "keyboard-layout"
 } else
 {
   $Logger::Info("Keyboard layout already installed")
@@ -115,10 +106,7 @@ if (-not (Test-StageFlag "style-settings"))
       return
     }
   }
-  if (Get-UserConfirmation "Style settings completed successfully. Set flag to skip on next run?")
-  {
-    Set-StageFlag "style-settings"
-  }
+  Set-StageFlag "style-settings"
 }
 $Logger::EndTask($true)
 
@@ -135,10 +123,7 @@ if (-not (Test-StageFlag "openssh-setup"))
       return
     }
   }
-  if (Get-UserConfirmation "OpenSSH setup completed successfully. Set flag to skip on next run?")
-  {
-    Set-StageFlag "openssh-setup"
-  }
+  Set-StageFlag "openssh-setup"
 }
 $Logger::EndTask($true)
 
@@ -155,10 +140,7 @@ if (-not (Test-StageFlag "personal-repos-setup"))
       return
     }
   }
-  if (Get-UserConfirmation "Personal repositories setup completed successfully. Set flag to skip on next run?")
-  {
-    Set-StageFlag "personal-repos-setup"
-  }
+  Set-StageFlag "personal-repos-setup"
 }
 $Logger::EndTask($true)
 
@@ -175,10 +157,7 @@ if (-not (Test-StageFlag "cli-utils-setup"))
       return
     }
   }
-  if (Get-UserConfirmation "CLI utilities installation completed successfully. Set flag to skip on next run?")
-  {
-    Set-StageFlag "cli-utils-setup"
-  }
+  Set-StageFlag "cli-utils-setup"
 }
 $Logger::EndTask($true)
 
@@ -195,10 +174,7 @@ if (-not (Test-StageFlag "nextcloud-setup"))
     Handle-Error "Failed to install Nextcloud" "Nextcloud Installation"
   } else 
   {
-    if (Get-UserConfirmation "Nextcloud installation completed successfully. Set flag to skip on next run?")
-    {
-      Set-StageFlag "nextcloud-setup"
-    }
+    Set-StageFlag "nextcloud-setup"
   }
 } else
 {
@@ -216,10 +192,7 @@ if (-not (Test-StageFlag "keepassxc-setup"))
     Handle-Error "Failed to install KeePassXC" "KeePassXC Installation"
   } else
   {
-    if (Get-UserConfirmation "KeePassXC installation completed successfully. Set flag to skip on next run?")
-    {
-      Set-StageFlag "keepassxc-setup"
-    }
+    Set-StageFlag "keepassxc-setup"
   }
 } else
 {
@@ -237,10 +210,7 @@ if (-not (Test-StageFlag "gpg-setup"))
     Handle-Error "Failed to install GnuPG" "GnuPG Installation"
   } else
   {
-    if (Get-UserConfirmation "GnuPG installation completed successfully. Set flag to skip on next run?")
-    {
-      Set-StageFlag "gpg-setup"
-    }
+    Set-StageFlag "gpg-setup"
   }
 } else
 {
@@ -258,10 +228,7 @@ if (-not (Test-StageFlag "edge-config"))
     Handle-Error "Failed to configure Edge" "Edge Configuration"
   } else
   {
-    if (Get-UserConfirmation "Edge configuration completed successfully. Set flag to skip on next run?")
-    {
-      Set-StageFlag "edge-config"
-    }
+    Set-StageFlag "edge-config"
   }
 } else
 {
@@ -279,10 +246,7 @@ if (-not (Test-StageFlag "powertoys-setup"))
     Handle-Error "Failed to install PowerToys" "PowerToys Installation"
   } else
   {
-    if (Get-UserConfirmation "PowerToys installation completed successfully. Set flag to skip on next run?")
-    {
-      Set-StageFlag "powertoys-setup"
-    }
+    Set-StageFlag "powertoys-setup"
   }
 } else
 {
@@ -317,7 +281,6 @@ if (-not (Test-StageFlag "work-tools-setup"))
   $Logger::EndTask($true)
 }
 
-
 # UniGet UI
 $Logger::StartTask("UniGet UI Installation")
 if (-not (Test-StageFlag "uniget-setup"))
@@ -328,10 +291,7 @@ if (-not (Test-StageFlag "uniget-setup"))
     Handle-Error "Failed to install UniGet UI" "UniGet UI Installation"
   } else
   {
-    if (Get-UserConfirmation "UniGet UI installation completed successfully. Set flag to skip on next run?")
-    {
-      Set-StageFlag "uniget-setup"
-    }
+    Set-StageFlag "uniget-setup"
   }
 } else
 {
@@ -349,10 +309,7 @@ if (-not (Test-StageFlag "chatgpt-setup"))
     Handle-Error "Failed to set up ChatGPT" "ChatGPT Setup"
   } else
   {
-    if (Get-UserConfirmation "ChatGPT setup completed successfully. Set flag to skip on next run?")
-    {
-      Set-StageFlag "chatgpt-setup"
-    }
+    Set-StageFlag "chatgpt-setup"
   }
 } else
 {
@@ -370,10 +327,7 @@ if (-not (Test-StageFlag "todoist-setup"))
     Handle-Error "Failed to install Todoist" "Todoist Installation"
   } else
   {
-    if (Get-UserConfirmation "Todoist installation completed successfully. Set flag to skip on next run?")
-    {
-      Set-StageFlag "todoist-setup"
-    }
+    Set-StageFlag "todoist-setup"
   }
 } else
 {
@@ -391,10 +345,7 @@ if (-not (Test-StageFlag "final-system-config"))
     Handle-Error "Failed to apply final system configurations" "Final System Configuration"
   } else
   {
-    if (Get-UserConfirmation "Final system configuration completed successfully. Set flag to skip on next run?")
-    {
-      Set-StageFlag "final-system-config"
-    }
+    Set-StageFlag "final-system-config"
   }
 } else
 {

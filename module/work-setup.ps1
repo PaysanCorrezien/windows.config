@@ -56,9 +56,10 @@ function Install-UniGetUI {
         Write-Host "3. Load your previous settings" -ForegroundColor Yellow
         Write-Host "4. Reinstall your previous working state" -ForegroundColor Yellow
         
-        if (-not (Get-UserConfirmation "Did you successfully set up UniGet UI and restore your settings?")) {
-            return $false
-        }
+        # Launch UniGet UI
+        Start-Process "unigetui.exe"
+        Write-Host "`nPress any key after completing UniGet UI setup..." -ForegroundColor Yellow
+        $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
         
         return $true
     }
@@ -80,9 +81,10 @@ function Install-ChatGPT {
     Write-Host "3. Sign in to your OpenAI account" -ForegroundColor Yellow
     Write-Host "4. Configure your preferred settings" -ForegroundColor Yellow
     
-    if (-not (Get-UserConfirmation "Did you successfully set up ChatGPT?")) {
-        return $false
-    }
+    # Launch Microsoft Store for ChatGPT
+    Start-Process "ms-windows-store://pdp/?productid=9NRXH7TPWL1K"
+    Write-Host "`nPress any key after completing ChatGPT setup..." -ForegroundColor Yellow
+    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     
     return $true
 }
@@ -104,9 +106,10 @@ function Install-Todoist {
     Write-Host "3. Enable 'Start on Startup'" -ForegroundColor Yellow
     Write-Host "4. Enable 'Run in Background'" -ForegroundColor Yellow
     
-    if (-not (Get-UserConfirmation "Did you successfully configure Todoist?")) {
-        return $false
-    }
+    # Launch Todoist
+    Start-Process "todoist.exe"
+    Write-Host "`nPress any key after completing Todoist setup..." -ForegroundColor Yellow
+    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     
     return $true
 }

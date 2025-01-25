@@ -38,24 +38,17 @@ function Install-EdgeConfiguration {
     
     Write-Status "Configuring Microsoft Edge..." -Status "Starting" -Color "Yellow"
     
-    # Configure keyboard shortcuts for SurfingKeys
-    if (-not (Set-EdgeKeyboardShortcuts)) {
-        return $false
-    }
-    
     Write-Host "`nPlease configure Edge:" -ForegroundColor Yellow
     Write-Host "1. Sign in with your Outlook account" -ForegroundColor Yellow
     Write-Host "2. Sign in with your WorkM account" -ForegroundColor Yellow
     Write-Host "3. Verify sync is working" -ForegroundColor Yellow
-    Write-Host "4. Install necessary extensions:" -ForegroundColor Yellow
-    Write-Host "   - SurfingKeys" -ForegroundColor Yellow
-    Write-Host "   - uBlock Origin" -ForegroundColor Yellow
-    Write-Host "   - KeePassXC-Browser" -ForegroundColor Yellow
+    Write-Host "4. Install necessary extensions" -ForegroundColor Yellow
     Write-Host "5. Configure your preferred settings" -ForegroundColor Yellow
     
-    if (-not (Get-UserConfirmation "Did you successfully configure Edge with both accounts and extensions?")) {
-        return $false
-    }
+    # Launch Edge to allow user to configure
+    Start-Process "msedge.exe"
+    Write-Host "`nPress any key after completing Edge configuration..." -ForegroundColor Yellow
+    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     
     return $true
 }

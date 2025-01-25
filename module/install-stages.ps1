@@ -14,13 +14,10 @@ function Install-WindowsUtility
     Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"irm christitus.com/win | iex`"" -Wait -Verb RunAs
         
     Write-Host "`nPlease review and complete the Windows setup utility configuration." -ForegroundColor Yellow
-    if (Get-UserConfirmation "Did you successfully complete the Windows setup utility configuration?")
-    {
-      Set-StageFlag "windows-utility"
-      Write-Status "Windows setup utility" -Status "Completed" -Color "Green"
-      return $true
-    }
-    return $false
+    Write-Host "Press any key after completing Windows setup utility configuration..." -ForegroundColor Yellow
+    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+    Write-Status "Windows setup utility" -Status "Completed" -Color "Green"
+    return $true
   } catch
   {
     Write-Warning "Windows setup utility encountered an error: $_"
