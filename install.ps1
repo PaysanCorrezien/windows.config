@@ -237,13 +237,29 @@ $Logger::EndTask($true)
 $Logger::StartTask("Edge Configuration")
 if (-not (Test-StageFlag "edge-config"))
 {
+  $configSuccess = $true
+  
+  # Run Edge Configuration
   if (-not (& $edgeConfig['Install-EdgeConfiguration']))
   {
     $Logger::Error("Edge configuration failed", $null)
-    Handle-Error "Failed to configure Edge" "Edge Configuration"
-  } else
+    $configSuccess = $false
+  }
+  
+  # Configure Edge Keyboard Shortcuts
+  if (-not (& $edgeConfig['Set-EdgeKeyboardShortcuts']))
+  {
+    $Logger::Error("Edge keyboard shortcuts configuration failed", $null)
+    $configSuccess = $false
+  }
+  
+  if ($configSuccess)
   {
     Set-StageFlag "edge-config"
+  }
+  else 
+  {
+    Handle-Error "Failed to configure Edge" "Edge Configuration"
   }
 } else
 {
