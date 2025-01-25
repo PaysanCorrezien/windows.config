@@ -171,7 +171,12 @@ if (-not (Test-StageFlag "nextcloud-setup"))
   if (-not (& $appInstallations['Install-Nextcloud']))
   {
     $Logger::Error("Nextcloud installation failed", $null)
-    Handle-Error "Failed to install Nextcloud" "Nextcloud Installation"
+    if (-not (Handle-Error "Failed to install Nextcloud" "Nextcloud Installation"))
+    {
+      $Logger::EndTask($false)
+      Exit-Script
+      exit 1  # Force immediate script termination
+    }
   } else 
   {
     Set-StageFlag "nextcloud-setup"
@@ -189,7 +194,12 @@ if (-not (Test-StageFlag "keepassxc-setup"))
   if (-not (& $appInstallations['Install-KeePassXC']))
   {
     $Logger::Error("KeePassXC installation failed", $null)
-    Handle-Error "Failed to install KeePassXC" "KeePassXC Installation"
+    if (-not (Handle-Error "Failed to install KeePassXC" "KeePassXC Installation"))
+    {
+      $Logger::EndTask($false)
+      Exit-Script
+      exit 1  # Force immediate script termination
+    }
   } else
   {
     Set-StageFlag "keepassxc-setup"
@@ -207,7 +217,12 @@ if (-not (Test-StageFlag "gpg-setup"))
   if (-not (& $appInstallations['Install-GnuPG']))
   {
     $Logger::Error("GnuPG installation failed", $null)
-    Handle-Error "Failed to install GnuPG" "GnuPG Installation"
+    if (-not (Handle-Error "Failed to install GnuPG" "GnuPG Installation"))
+    {
+      $Logger::EndTask($false)
+      Exit-Script
+      exit 1  # Force immediate script termination
+    }
   } else
   {
     Set-StageFlag "gpg-setup"
