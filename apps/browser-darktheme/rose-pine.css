@@ -1,0 +1,207 @@
+/* Reset base colors */
+html,
+body,
+:not([style*="background-color:"]) {
+  background-color: rgb(26, 23, 36) !important;
+}
+
+/* Handle overlay elements */
+[class*="fixed"],
+[class*="absolute"],
+[class*="sticky"],
+[style*="position: fixed"],
+[style*="position: absolute"],
+[style*="position: sticky"] {
+  background-color: transparent !important;
+  pointer-events: auto !important;
+}
+
+/* Override problematic z-index elements */
+[style*="z-index:"],
+[class*="z-"] {
+  background-color: transparent !important;
+}
+
+/* Base text color */
+html,
+body,
+:not([style*="color:"]),
+.sr-reader *:not([class*="sr-pivot"]) {
+  color: rgb(224, 222, 245) !important;
+}
+
+/* Heading colors */
+h1:not([style*="color:"]),
+h2:not([style*="color:"]),
+h3:not([style*="color:"]),
+h4:not([style*="color:"]),
+h5:not([style*="color:"]),
+h6:not([style*="color:"]) {
+  color: rgb(235, 189, 186) !important;
+}
+
+/* Citations and quotes */
+cite:not([style*="color:"]),
+blockquote:not([style*="color:"]) {
+  color: rgb(156, 207, 217) !important;
+}
+
+/* Form elements */
+input:not([style*="background-color:"]),
+textarea:not([style*="background-color:"]),
+button:not([style*="background-color:"]),
+select:not([style*="background-color:"]),
+[role="button"] {
+  background-color: rgb(31, 28, 46) !important;
+  color: rgb(224, 222, 245) !important;
+}
+
+/* Form elements hover state */
+input:not([style*="background-color:"]):hover,
+textarea:not([style*="background-color:"]):hover,
+button:not([style*="background-color:"]):hover,
+select:not([style*="background-color:"]):hover,
+[role="button"]:hover {
+  background-color: rgb(38, 36, 59) !important;
+}
+
+/* Form elements active/focus state */
+input:not([style*="background-color:"]):active,
+input:not([style*="background-color:"]):focus,
+textarea:not([style*="background-color:"]):active,
+textarea:not([style*="background-color:"]):focus,
+button:not([style*="background-color:"]):active,
+button:not([style*="background-color:"]):focus,
+select:not([style*="background-color:"]):active,
+select:not([style*="background-color:"]):focus,
+[role="button"]:active,
+[role="button"]:focus {
+  background-color: rgb(38, 36, 59) !important;
+  outline-color: rgb(156, 207, 217) !important;
+}
+
+/* Links */
+a:not([style*="color:"]) {
+  color: rgb(48, 115, 143) !important;
+}
+
+a:not([style*="color:"]):hover {
+  color: rgb(156, 207, 217) !important;
+}
+
+a:not([style*="color:"]):active,
+a:not([style*="color:"]):focus {
+  color: rgb(156, 207, 217) !important;
+}
+
+/* Borders */
+:not([style*="border-color:"]),
+::before,
+::after {
+  border-color: rgb(38, 36, 59) !important;
+}
+
+/* Empty divs and special elements */
+div:empty,
+.sr-reader *,
+.sr-backdrop {
+  background-color: rgba(26, 23, 36, 0.5) !important;
+}
+
+/* Placeholders */
+input::placeholder,
+textarea::placeholder {
+  color: rgba(196, 166, 232, 0.5) !important;
+}
+
+/* Remove background images from form elements */
+input:not([style*="background-image:"]),
+textarea:not([style*="background-image:"]) {
+  background-image: none !important;
+}
+
+/* Handle modals and overlays */
+[class*="backdrop"],
+[class*="overlay"],
+[role="dialog"],
+[aria-modal="true"] {
+  background-color: rgba(26, 23, 36, 0.8) !important;
+}
+
+/* Force transparency on problematic elements */
+[class*="pointer-events-none"][class*="fixed"],
+[class*="pointer-events-none"][class*="absolute"] {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Handle iframes */
+iframe {
+  background-color: rgb(26, 23, 36) !important;
+}
+
+/* SVG elements */
+svg {
+  fill: currentColor !important;
+}
+
+/* Code blocks and pre elements */
+pre,
+code {
+  background-color: rgb(31, 28, 46) !important;
+  color: rgb(224, 222, 245) !important;
+}
+
+/* Table elements */
+table,
+th,
+td {
+  background-color: rgb(31, 28, 46) !important;
+  border-color: rgb(38, 36, 59) !important;
+}
+
+/* Selection color */
+::selection {
+  background-color: rgba(156, 207, 217, 0.3) !important;
+  color: rgb(224, 222, 245) !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+::-webkit-scrollbar-track {
+  background-color: rgb(31, 28, 46) !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgb(38, 36, 59) !important;
+  border-radius: 6px !important;
+  border: 3px solid rgb(31, 28, 46) !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(48, 46, 76) !important;
+}
+
+/* Fix for sticky headers and footers */
+[class*="sticky"],
+[style*="position: sticky"] {
+  background-color: rgb(26, 23, 36) !important;
+}
+
+/* Ensure modals stay visible */
+[role="dialog"] *,
+[aria-modal="true"] * {
+  background-color: inherit;
+}
+
+/* Handle dynamic content */
+[data-theme],
+[class*="theme-"] {
+  background-color: rgb(26, 23, 36) !important;
+  color: rgb(224, 222, 245) !important;
+}
