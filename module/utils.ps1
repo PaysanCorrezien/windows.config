@@ -46,15 +46,19 @@ function Set-Env
       $currentValue = [System.Environment]::GetEnvironmentVariable('Path', $target)
             
       # Split paths into array and remove empty entries
-      $currentPaths = $currentValue -split ';' | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
+      $currentPaths = @()
+      if ($currentValue)
+      {
+        $currentPaths = $currentValue -split ';' | Where-Object { $_ -and (Test-Path $_) }
+      }
       $newPath = $Value.TrimEnd(';')
             
       # Check if path is already in the PATH
       if ($currentPaths -notcontains $newPath)
       {
-        # Add new path and remove any duplicates
-        $allPaths = @($newPath) + $currentPaths | Select-Object -Unique
-        $finalValue = $allPaths -join ';'
+        # Add new path to the beginning and remove any duplicates
+        $allPaths = @($currentPaths) + @($newPath) | Select-Object -Unique
+        $finalValue = ($allPaths | Where-Object { $_ }) -join ';'
                 
         # Set the new PATH
         [System.Environment]::SetEnvironmentVariable('Path', $finalValue, $target)
