@@ -239,13 +239,6 @@ if (-not (Test-StageFlag "edge-config"))
 {
   $configSuccess = $true
   
-  # Run Edge Configuration
-  if (-not (& $edgeConfig['Install-EdgeConfiguration']))
-  {
-    $Logger::Error("Edge configuration failed", $null)
-    $configSuccess = $false
-  }
-  
   # Configure Edge Keyboard Shortcuts
   if (-not (& $edgeConfig['Set-EdgeKeyboardShortcuts']))
   {
@@ -253,11 +246,18 @@ if (-not (Test-StageFlag "edge-config"))
     $configSuccess = $false
   }
   
+  # Run Edge Configuration
+  if (-not (& $edgeConfig['Install-EdgeConfiguration']))
+  {
+    $Logger::Error("Edge configuration failed", $null)
+    $configSuccess = $false
+  }
+  
+  
   if ($configSuccess)
   {
     Set-StageFlag "edge-config"
-  }
-  else 
+  } else 
   {
     Handle-Error "Failed to configure Edge" "Edge Configuration"
   }
